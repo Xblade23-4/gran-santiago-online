@@ -254,6 +254,11 @@ function advanceTurn(room) {
   }
 
   room.pendingBuyTileId = null;
+  room.pendingCard = null;
+  if (room.cardConfirmTimer) {
+    clearTimeout(room.cardConfirmTimer);
+    room.cardConfirmTimer = null;
+  }
   room.doublesCount = 0;
 
   let nextIdx = room.turnIndex;
@@ -372,21 +377,61 @@ function evaluateLandingTile(room, player, diceSum, ioInstance) {
 
     addLog(room, `🃏 [${deckTitle}] ${player.name}: "${card.title}" — ${card.text}`, 'card');
 
+    room.turnPhase = 'CARD_CONFIRM';
+    room.pendingCard = {
+      id: 'card_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      playerId: player.id,
+      playerName: player.name,
+      deckType: tile.type,
+      deckTitle,
+      card,
+      diceSum
+    };
+
     if (ioInstance) {
-      ioInstance.to(room.code).emit('card_drawn', {
-        playerId: player.id,
-        playerName: player.name,
-        deckType: tile.type,
-        deckTitle,
-        card
-      });
+      ioInstance.to(room.code).emit('card_drawn', room.pendingCard);
     }
 
-    applyCardAction(room, player, card, diceSum, ioInstance);
+    if (room.cardConfirmTimer) {
+      clearTimeout(room.cardConfirmTimer);
+    }
+    // Timeout de respaldo en servidor (1s dados + caminata + 10s de ventana modal)
+    room.cardConfirmTimer = setTimeout(() => {
+      resolvePendingCard(room, ioInstance || io);
+    }, 12500);
     return;
   }
 
   room.turnPhase = 'END_TURN';
+}
+
+function resolvePendingCard(room, ioInstance) {
+  if (!room || room.turnPhase !== 'CARD_CONFIRM' || !room.pendingCard) return;
+  if (room.cardConfirmTimer) {
+    clearTimeout(room.cardConfirmTimer);
+    room.cardConfirmTimer = null;
+  }
+
+  const pending = room.pendingCard;
+  room.pendingCard = null;
+  const player = room.players.find((p) => p.id === pending.playerId);
+
+  if (!player || player.bankrupt) {
+    room.turnPhase = 'END_TURN';
+  } else {
+    applyCardAction(room, player, pending.card, pending.diceSum, ioInstance);
+  }
+
+  if (ioInstance) {
+    ioInstance.to(room.code).emit('card_resolved', { cardId: pending.id });
+  }
+  broadcastRoomState(room);
+
+  // Si es el turno de un Bot y la tarjeta no generó otra tarjeta en cadena, continuar su turno
+  const current = getCurrentPlayer(room);
+  if (current && current.isBot && !current.bankrupt && room.turnPhase !== 'CARD_CONFIRM') {
+    scheduleBotPostLanding(room, current);
+  }
 }
 
 function applyCardAction(room, player, card, diceSum, ioInstance) {
@@ -556,6 +601,55 @@ function handleRollDice(room, player, ioInstance) {
 }
 
 // Inteligencia Artificial para Bots Chilenos
+function scheduleBotPostLanding(room, botPlayer, delayMs = 2600) {
+  setTimeout(() => {
+    if (!rooms.has(room.code) || room.status !== 'playing') return;
+    const nowCurrent = getCurrentPlayer(room);
+    if (!nowCurrent || nowCurrent.id !== botPlayer.id) return;
+    if (room.turnPhase === 'CARD_CONFIRM') return; // Esperando que se cierre o venza los 10s de la tarjeta
+
+    // Decisión de compra del Bot
+    if (room.turnPhase === 'BUY_DECISION' && room.pendingBuyTileId !== null) {
+      const tile = BOARD_TILES[room.pendingBuyTileId];
+      const prop = room.properties[room.pendingBuyTileId];
+      if (tile && prop && !prop.ownerId && botPlayer.money >= tile.price) {
+        botPlayer.money -= tile.price;
+        prop.ownerId = botPlayer.id;
+        addLog(room, `🏢 ${botPlayer.name} compró ${tile.name} por ${formatCLP(tile.price)}.`, 'buy');
+      }
+      room.pendingBuyTileId = null;
+      room.turnPhase = 'END_TURN';
+      broadcastRoomState(room);
+    }
+
+    // Intentar edificar casas si tiene un grupo completo y buena liquidez
+    for (const [tileIdStr, prop] of Object.entries(room.properties)) {
+      const tileId = Number(tileIdStr);
+      const tile = BOARD_TILES[tileId];
+      if (
+        tile &&
+        tile.type === 'property' &&
+        prop.ownerId === botPlayer.id &&
+        !prop.mortgaged &&
+        prop.houses < 5 &&
+        ownsFullGroup(room, botPlayer.id, tile.group) &&
+        botPlayer.money >= tile.houseCost + 250000
+      ) {
+        botPlayer.money -= tile.houseCost;
+        prop.houses += 1;
+        const label = prop.houses === 5 ? 'una Torre Costanera (Hotel)' : `Casa #${prop.houses}`;
+        addLog(room, `🏗️ ${botPlayer.name} construyó ${label} en ${tile.name} por ${formatCLP(tile.houseCost)}.`, 'buy');
+      }
+    }
+
+    setTimeout(() => {
+      if (!rooms.has(room.code) || room.status !== 'playing') return;
+      advanceTurn(room);
+      broadcastRoomState(room);
+    }, 1400);
+  }, delayMs);
+}
+
 function scheduleBotTurn(room) {
   setTimeout(() => {
     if (!rooms.has(room.code) || room.status !== 'playing') return;
@@ -574,51 +668,12 @@ function scheduleBotTurn(room) {
     handleRollDice(room, current, io);
     broadcastRoomState(room);
 
-    setTimeout(() => {
-      if (!rooms.has(room.code) || room.status !== 'playing') return;
-      const nowCurrent = getCurrentPlayer(room);
-      if (!nowCurrent || nowCurrent.id !== current.id) return;
-
-      // Decisión de compra del Bot
-      if (room.turnPhase === 'BUY_DECISION' && room.pendingBuyTileId !== null) {
-        const tile = BOARD_TILES[room.pendingBuyTileId];
-        const prop = room.properties[room.pendingBuyTileId];
-        if (tile && prop && !prop.ownerId && current.money >= tile.price) {
-          current.money -= tile.price;
-          prop.ownerId = current.id;
-          addLog(room, `🏢 ${current.name} compró ${tile.name} por ${formatCLP(tile.price)}.`, 'buy');
-        }
-        room.pendingBuyTileId = null;
-        room.turnPhase = 'END_TURN';
-        broadcastRoomState(room);
-      }
-
-      // Intentar edificar casas si tiene un grupo completo y buena liquidez
-      for (const [tileIdStr, prop] of Object.entries(room.properties)) {
-        const tileId = Number(tileIdStr);
-        const tile = BOARD_TILES[tileId];
-        if (
-          tile &&
-          tile.type === 'property' &&
-          prop.ownerId === current.id &&
-          !prop.mortgaged &&
-          prop.houses < 5 &&
-          ownsFullGroup(room, current.id, tile.group) &&
-          current.money >= tile.houseCost + 250000
-        ) {
-          current.money -= tile.houseCost;
-          prop.houses += 1;
-          const label = prop.houses === 5 ? 'una Torre Costanera (Hotel)' : `Casa #${prop.houses}`;
-          addLog(room, `🏗️ ${current.name} construyó ${label} en ${tile.name} por ${formatCLP(tile.houseCost)}.`, 'buy');
-        }
-      }
-
-      setTimeout(() => {
-        if (!rooms.has(room.code) || room.status !== 'playing') return;
-        advanceTurn(room);
-        broadcastRoomState(room);
-      }, 1400);
-    }, 2200);
+    // Si cayó en tarjeta "?", resolvePendingCard continuará el turno del Bot tras cerrarse la ventana o cumplir los 10s
+    if (room.turnPhase !== 'CARD_CONFIRM') {
+      const steps = (room.lastDice?.[0] || 3) + (room.lastDice?.[1] || 3);
+      const walkWait = 1000 + steps * 190 + 400;
+      scheduleBotPostLanding(room, current, walkWait);
+    }
   }, 1000);
 }
 
@@ -638,6 +693,7 @@ function serializeRoom(room) {
     turnIndex: room.turnIndex,
     turnPhase: room.turnPhase,
     pendingBuyTileId: room.pendingBuyTileId,
+    pendingCard: room.pendingCard || null,
     lastDice: room.lastDice,
     doublesCount: room.doublesCount,
     pot: room.pot,
@@ -933,6 +989,12 @@ io.on('connection', (socket) => {
       clearInterval(room.cualEsBotTimer);
       room.cualEsBotTimer = null;
     }
+    if (room.cardConfirmTimer) {
+      clearTimeout(room.cardConfirmTimer);
+      room.cardConfirmTimer = null;
+    }
+    room.pendingCard = null;
+    room.pendingBuyTileId = null;
     room.status = 'lobby';
     room.winner = null;
     room.properties = createInitialProperties();
@@ -958,6 +1020,26 @@ io.on('connection', (socket) => {
 
     handleRollDice(room, current, io);
     broadcastRoomState(room);
+  });
+
+  // Confirmar / cerrar manualmente cuadro de tarjeta "?" (o al expirar los 10s en cliente)
+  socket.on('confirm_card', (_, callback) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || room.status !== 'playing') return;
+    if (room.turnPhase !== 'CARD_CONFIRM' || !room.pendingCard) {
+      if (callback) callback({ ok: false });
+      return;
+    }
+
+    const current = getCurrentPlayer(room);
+    // Puede confirmar quien sacó la tarjeta, o cualquier humano si es turno de un Bot
+    if (current && !current.isBot && current.id !== currentPlayerId) {
+      if (callback) callback({ ok: false });
+      return;
+    }
+
+    resolvePendingCard(room, io);
+    if (callback) callback({ ok: true });
   });
 
   // Pagar fianza de $50.000 CLP para salir de la Comisaría antes de lanzar

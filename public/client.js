@@ -47,6 +47,9 @@ let hoppingPlayers = new Set();
 let isDiceRollingAnim = false;
 let pendingRoomStateAfterDice = null;
 let pendingCardAfterDice = null;
+let pendingCardAfterWalk = null;
+let cardCountdownIntervalId = null;
+let activeCardId = null;
 let diceIntervalId = null;
 let inspectedTileId = null;
 let soundEnabled = true;
@@ -230,6 +233,16 @@ function animatePlayerMovement(player, fromPos, toPos) {
       delete walkingTimers[player.id];
       hoppingPlayers.delete(player.id);
       renderTokensOnBoard(currentRoomState);
+
+      if (pendingCardAfterWalk && (!pendingCardAfterWalk.playerId || pendingCardAfterWalk.playerId === player.id)) {
+        const cd = pendingCardAfterWalk;
+        pendingCardAfterWalk = null;
+        showDrawnCardNotification(cd);
+      }
+
+      if (currentRoomState) {
+        updateTurnActionControls(currentRoomState);
+      }
       return;
     }
 
@@ -639,10 +652,23 @@ function bindUIEvents() {
     closeTopLayer(document.getElementById('property-dialog'));
   });
 
-  // Modal de Tarjeta Sacada
+  // Modal de Tarjeta Sacada (cierre manual o confirmación antes de los 10s)
+  const drawnCardDialog = document.getElementById('drawn-card-dialog');
   document.getElementById('btn-close-drawn-card').addEventListener('click', () => {
-    closeTopLayer(document.getElementById('drawn-card-dialog'));
+    confirmAndCloseDrawnCard(false);
   });
+  if (drawnCardDialog) {
+    drawnCardDialog.addEventListener('close', () => {
+      if (cardCountdownIntervalId) {
+        clearInterval(cardCountdownIntervalId);
+        cardCountdownIntervalId = null;
+      }
+      if (activeCardId) {
+        activeCardId = null;
+        socket.emit('confirm_card');
+      }
+    });
+  }
 
   document.getElementById('btn-build-house').addEventListener('click', () => {
     if (inspectedTileId === null) return;
@@ -836,13 +862,46 @@ socket.on('dice_rolled', ({ dice }) => {
     if (pendingCardAfterDice) {
       const cd = pendingCardAfterDice;
       pendingCardAfterDice = null;
-      showDrawnCardNotification(cd);
+      queueOrShowDrawnCard(cd);
     }
   }, 1000);
 });
 
-function showDrawnCardNotification({ playerName, deckType, deckTitle, card }) {
+function queueOrShowDrawnCard(payload) {
+  if (!payload) return;
+  if (isDiceRollingAnim) {
+    pendingCardAfterDice = payload;
+    return;
+  }
+  // Si el personaje aún está caminando casilla por casilla hacia "?", esperar a que llegue
+  if (payload.playerId && walkingTimers[payload.playerId]) {
+    pendingCardAfterWalk = payload;
+    return;
+  }
+  showDrawnCardNotification(payload);
+}
+
+function confirmAndCloseDrawnCard(fromServerEvent = false) {
+  if (cardCountdownIntervalId) {
+    clearInterval(cardCountdownIntervalId);
+    cardCountdownIntervalId = null;
+  }
+  const shouldEmit = !fromServerEvent && Boolean(activeCardId);
+  activeCardId = null;
+
+  const cardDialog = document.getElementById('drawn-card-dialog');
+  if (cardDialog && cardDialog.open) {
+    closeTopLayer(cardDialog);
+  }
+
+  if (shouldEmit) {
+    socket.emit('confirm_card');
+  }
+}
+
+function showDrawnCardNotification({ id, playerName, deckType, deckTitle, card }) {
   playSoundEffect('card');
+  activeCardId = id || ('card_' + Date.now());
 
   const isChance = deckType === 'chance';
   const headerColor = isChance ? '#f97316' : '#16a34a';
@@ -860,7 +919,7 @@ function showDrawnCardNotification({ playerName, deckType, deckTitle, card }) {
   document.getElementById('card-banner-title').textContent = card.title;
   document.getElementById('card-banner-text').textContent = card.text;
 
-  // Abrir modal emergente de tarjeta con animación de entrada
+  // Abrir modal emergente de tarjeta con timeout de 10s o cierre manual
   const cardDialog = document.getElementById('drawn-card-dialog');
   if (cardDialog) {
     document.getElementById('drawn-card-header').style.background = headerColor;
@@ -869,16 +928,36 @@ function showDrawnCardNotification({ playerName, deckType, deckTitle, card }) {
     document.getElementById('drawn-card-icon').textContent = isChance ? '❓' : '🍀';
     document.getElementById('drawn-card-player').textContent = `Tarjeta sacada por ${playerName}`;
     document.getElementById('drawn-card-text').textContent = card.text;
+
+    let secondsLeft = 10;
+    const countdownSpan = document.getElementById('drawn-card-countdown');
+    const closeBtn = document.getElementById('btn-close-drawn-card');
+    const updateCountdownUI = () => {
+      if (countdownSpan) countdownSpan.textContent = String(secondsLeft);
+      if (closeBtn) closeBtn.textContent = `¡Entendido! (${secondsLeft}s)`;
+    };
+    updateCountdownUI();
+
+    if (cardCountdownIntervalId) clearInterval(cardCountdownIntervalId);
+    cardCountdownIntervalId = setInterval(() => {
+      secondsLeft -= 1;
+      if (secondsLeft <= 0) {
+        confirmAndCloseDrawnCard(false);
+        return;
+      }
+      updateCountdownUI();
+    }, 1000);
+
     if (!cardDialog.open) cardDialog.showModal();
   }
 }
 
 socket.on('card_drawn', (payload) => {
-  if (isDiceRollingAnim) {
-    pendingCardAfterDice = payload;
-    return;
-  }
-  showDrawnCardNotification(payload);
+  queueOrShowDrawnCard(payload);
+});
+
+socket.on('card_resolved', () => {
+  confirmAndCloseDrawnCard(true);
 });
 
 socket.on('cual_es_point', ({ playerId, playerName, symbol }) => {
@@ -1087,55 +1166,19 @@ function renderGame(state) {
   d1.textContent = DICE_FACES[(state.lastDice[0] || 1) - 1];
   d2.textContent = DICE_FACES[(state.lastDice[1] || 1) - 1];
 
-  const currentPlayer = state.players[state.turnIndex];
-  const isMyTurn = currentPlayer && currentPlayer.id === myPlayerId;
-
-  // Banner de turno o ganador
-  const turnBanner = document.getElementById('turn-banner');
-  if (state.status === 'finished' && state.winner) {
-    turnBanner.innerHTML = `🏆 ¡${state.winner.avatar.icon} ${state.winner.name} GANA GRAN SANTIAGO!`;
-  } else if (currentPlayer) {
-    turnBanner.innerHTML = isMyTurn
-      ? `🟢 ¡ES TU TURNO, ${currentPlayer.avatar.icon} ${currentPlayer.name}!`
-      : `⏳ Turno de ${currentPlayer.avatar.icon} ${currentPlayer.name}`;
-  }
-
-  // Botones de acción en el centro
-  const rollBtn = document.getElementById('btn-roll-dice');
-  const bailBtn = document.getElementById('btn-pay-bail');
-  const buyBox = document.getElementById('buy-decision-box');
-  const endBtn = document.getElementById('btn-end-turn');
-
-  rollBtn.classList.add('hidden');
-  bailBtn.classList.add('hidden');
-  buyBox.classList.add('hidden');
-  endBtn.classList.add('hidden');
-
-  if (state.status === 'playing' && isMyTurn) {
-    if (state.turnPhase === 'ROLL') {
-      rollBtn.classList.remove('hidden');
-      if (currentPlayer.inJail && currentPlayer.money >= 50000) {
-        bailBtn.classList.remove('hidden');
-      }
-    } else if (state.turnPhase === 'BUY_DECISION' && state.pendingBuyTileId !== null) {
-      const tile = boardMeta.BOARD_TILES[state.pendingBuyTileId];
-      if (tile) {
-        buyBox.classList.remove('hidden');
-        const extraDetails = tile.type === 'property'
-          ? `<div style="font-size:0.75rem; color:#cbd5e1; margin-top:4px;">💸 Arriendo base: <strong>${formatCLP(tile.rents[0])}</strong> · 🏗️ Mejora Casa/Hotel: <strong>${formatCLP(tile.houseCost)}</strong> <button type="button" onclick="openPropertyModal(${tile.id})" class="btn btn-xs btn-secondary" style="margin-left:4px; padding:1px 6px;">Ver Carta</button></div>`
-          : (tile.type === 'station'
-            ? `<div style="font-size:0.75rem; color:#cbd5e1; margin-top:4px;">💸 Cobro 1–4 estaciones: <strong>${formatCompactCLP(tile.rents[0])} a ${formatCompactCLP(tile.rents[3])}</strong></div>`
-            : '');
-        document.getElementById('buy-prompt-text').innerHTML =
-          `¿Comprar <strong>${tile.name}</strong> por <span style="color:#4ade80">${formatCLP(tile.price)}</span>?${extraDetails}`;
-      }
-    } else if (state.turnPhase === 'END_TURN') {
-      endBtn.classList.remove('hidden');
-      endBtn.textContent = state.doublesCount > 0 && !currentPlayer.inJail
-        ? '🎲 Tirar de Nuevo (Dobles)'
-        : '⏭️ Terminar Turno';
+  // Detectar si algún jugador caminó de una casilla a otra para animarlo cuadro por cuadro ANTES de mostrar acciones de llegada
+  state.players.forEach((p) => {
+    if (p.bankrupt) return;
+    const prevPos = displayedPositions[p.id];
+    if (prevPos === undefined) {
+      displayedPositions[p.id] = p.position;
+    } else if (prevPos !== p.position && !walkingTimers[p.id]) {
+      animatePlayerMovement(p, prevPos, p.position);
     }
-  }
+  });
+
+  renderTokensOnBoard(state);
+  updateTurnActionControls(state);
 
   // Lista lateral de jugadores
   const playersList = document.getElementById('players-list');
@@ -1205,19 +1248,6 @@ function renderGame(state) {
     }
   });
 
-  // Detectar si algún jugador caminó de una casilla a otra para animarlo cuadro por cuadro
-  state.players.forEach((p) => {
-    if (p.bankrupt) return;
-    const prevPos = displayedPositions[p.id];
-    if (prevPos === undefined) {
-      displayedPositions[p.id] = p.position;
-    } else if (prevPos !== p.position && !walkingTimers[p.id]) {
-      animatePlayerMovement(p, prevPos, p.position);
-    }
-  });
-
-  renderTokensOnBoard(state);
-
   // Mis Propiedades
   renderMyProperties(state);
 
@@ -1226,6 +1256,73 @@ function renderGame(state) {
 
   // Crónica Financiera y Chat
   renderLogsAndChat(state);
+}
+
+// Actualiza los botones del centro solo cuando el jugador terminó de caminar hasta la casilla
+function updateTurnActionControls(state) {
+  if (!state || state.gameType === 'cual_es') return;
+  const currentPlayer = state.players[state.turnIndex];
+  const isMyTurn = currentPlayer && currentPlayer.id === myPlayerId;
+  const isCurrentWalking = Boolean(currentPlayer && walkingTimers[currentPlayer.id]);
+
+  // Banner de turno o ganador
+  const turnBanner = document.getElementById('turn-banner');
+  if (state.status === 'finished' && state.winner) {
+    turnBanner.innerHTML = `🏆 ¡${state.winner.avatar.icon} ${state.winner.name} GANA GRAN SANTIAGO!`;
+  } else if (currentPlayer) {
+    if (isCurrentWalking) {
+      const targetTile = boardMeta.BOARD_TILES[currentPlayer.position];
+      turnBanner.innerHTML = `🚶 ${currentPlayer.avatar.icon} ${currentPlayer.name} avanzando hacia <strong>${targetTile?.name || 'casilla'}</strong>...`;
+    } else if (state.turnPhase === 'CARD_CONFIRM') {
+      turnBanner.innerHTML = `🃏 Leyendo tarjeta de ${currentPlayer.avatar.icon} ${currentPlayer.name}...`;
+    } else {
+      turnBanner.innerHTML = isMyTurn
+        ? `🟢 ¡ES TU TURNO, ${currentPlayer.avatar.icon} ${currentPlayer.name}!`
+        : `⏳ Turno de ${currentPlayer.avatar.icon} ${currentPlayer.name}`;
+    }
+  }
+
+  // Botones de acción en el centro
+  const rollBtn = document.getElementById('btn-roll-dice');
+  const bailBtn = document.getElementById('btn-pay-bail');
+  const buyBox = document.getElementById('buy-decision-box');
+  const endBtn = document.getElementById('btn-end-turn');
+
+  rollBtn.classList.add('hidden');
+  bailBtn.classList.add('hidden');
+  buyBox.classList.add('hidden');
+  endBtn.classList.add('hidden');
+
+  // Esperar a que termine la animación de caminar o se confirme la tarjeta "?"
+  if (isCurrentWalking || state.turnPhase === 'CARD_CONFIRM') {
+    return;
+  }
+
+  if (state.status === 'playing' && isMyTurn) {
+    if (state.turnPhase === 'ROLL') {
+      rollBtn.classList.remove('hidden');
+      if (currentPlayer.inJail && currentPlayer.money >= 50000) {
+        bailBtn.classList.remove('hidden');
+      }
+    } else if (state.turnPhase === 'BUY_DECISION' && state.pendingBuyTileId !== null) {
+      const tile = boardMeta.BOARD_TILES[state.pendingBuyTileId];
+      if (tile) {
+        buyBox.classList.remove('hidden');
+        const extraDetails = tile.type === 'property'
+          ? `<div style="font-size:0.75rem; color:#cbd5e1; margin-top:4px;">💸 Arriendo base: <strong>${formatCLP(tile.rents[0])}</strong> · 🏗️ Mejora Casa/Hotel: <strong>${formatCLP(tile.houseCost)}</strong> <button type="button" onclick="openPropertyModal(${tile.id})" class="btn btn-xs btn-secondary" style="margin-left:4px; padding:1px 6px;">Ver Carta</button></div>`
+          : (tile.type === 'station'
+            ? `<div style="font-size:0.75rem; color:#cbd5e1; margin-top:4px;">💸 Cobro 1–4 estaciones: <strong>${formatCompactCLP(tile.rents[0])} a ${formatCompactCLP(tile.rents[3])}</strong></div>`
+            : '');
+        document.getElementById('buy-prompt-text').innerHTML =
+          `¿Comprar <strong>${tile.name}</strong> por <span style="color:#4ade80">${formatCLP(tile.price)}</span>?${extraDetails}`;
+      }
+    } else if (state.turnPhase === 'END_TURN') {
+      endBtn.classList.remove('hidden');
+      endBtn.textContent = state.doublesCount > 0 && !currentPlayer.inJail
+        ? '🎲 Tirar de Nuevo (Dobles)'
+        : '⏭️ Terminar Turno';
+    }
+  }
 }
 
 // Calcula en el cliente cuánto paga quien caiga en una casilla actualmente
