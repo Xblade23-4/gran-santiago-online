@@ -605,9 +605,9 @@ function scheduleBotTurn(room) {
         if (!rooms.has(room.code) || room.status !== 'playing') return;
         advanceTurn(room);
         broadcastRoomState(room);
-      }, 1500);
-    }, 3200);
-  }, 1200);
+      }, 1400);
+    }, 2200);
+  }, 1000);
 }
 
 function serializeRoom(room) {

@@ -789,7 +789,7 @@ socket.on('dice_rolled', ({ dice }) => {
       pendingCardAfterDice = null;
       showDrawnCardNotification(cd);
     }
-  }, 2000);
+  }, 1000);
 });
 
 function showDrawnCardNotification({ playerName, deckType, deckTitle, card }) {
