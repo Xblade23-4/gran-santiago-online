@@ -969,11 +969,60 @@ socket.on('cual_es_point', ({ playerId, playerName, symbol }) => {
   } else {
     playTone(480, 0.1, 'sine');
   }
+  animateCualEsCardFlyToWinner(playerId);
   const matchBanner = document.getElementById('cuales-last-match');
   if (matchBanner && symbol) {
-    matchBanner.innerHTML = `⚡ <strong>${playerName}</strong> encontró <strong>${symbol.icon} ${symbol.name}</strong> y ganó la carta!`;
+    matchBanner.innerHTML = `⚡ <strong>${playerName}</strong> encontró <strong>${symbol.icon} ${symbol.name}</strong> y se llevó la carta!`;
   }
 });
+
+function animateCualEsCardFlyToWinner(winnerId) {
+  const centerEl = document.getElementById('cuales-center-card');
+  if (!centerEl) return;
+
+  const seatEl = document.getElementById(`cuales-seat-${winnerId}`);
+  if (seatEl) {
+    seatEl.classList.add('seat-grabbing');
+    setTimeout(() => seatEl.classList.remove('seat-grabbing'), 520);
+  }
+
+  const targetEl =
+    winnerId === myPlayerId
+      ? (document.getElementById('cuales-my-card') || seatEl)
+      : (seatEl || document.getElementById('cuales-my-card'));
+  if (!targetEl) return;
+
+  const srcRect = centerEl.getBoundingClientRect();
+  const dstRect = targetEl.getBoundingClientRect();
+  if (!srcRect.width || !dstRect.width) return;
+
+  const flyer = document.createElement('div');
+  flyer.className = 'cuales-flying-card';
+  flyer.style.width = `${srcRect.width}px`;
+  flyer.style.height = `${srcRect.height}px`;
+  flyer.style.left = `${srcRect.left}px`;
+  flyer.style.top = `${srcRect.top}px`;
+  flyer.innerHTML = centerEl.innerHTML;
+  document.body.appendChild(flyer);
+
+  const srcCenterX = srcRect.left + srcRect.width / 2;
+  const srcCenterY = srcRect.top + srcRect.height / 2;
+  const dstCenterX = dstRect.left + dstRect.width / 2;
+  const dstCenterY = dstRect.top + dstRect.height / 2;
+
+  const dx = dstCenterX - srcCenterX;
+  const dy = dstCenterY - srcCenterY;
+  const scale = winnerId === myPlayerId ? 0.92 : 0.28;
+
+  requestAnimationFrame(() => {
+    flyer.style.transform = `translate(${dx}px, ${dy}px) scale(${scale}) rotate(22deg)`;
+    flyer.style.opacity = winnerId === myPlayerId ? '0.85' : '0.25';
+  });
+
+  setTimeout(() => {
+    flyer.remove();
+  }, 500);
+}
 
 socket.on('cual_es_penalty', ({ playerId, penaltyUntil, symbol }) => {
   if (playerId === myPlayerId) {
@@ -1141,11 +1190,13 @@ function renderGame(state) {
   const cualesRulesEl = document.getElementById('cuales-rules-panel');
   const sidebarTitleEl = document.getElementById('sidebar-players-title');
   const returnLobbyBtn = document.getElementById('btn-return-lobby');
+  const logPanelBox = document.getElementById('log-panel-box');
 
   boardGridEl.classList.toggle('hidden', isCualEs);
   cualesArenaEl.classList.toggle('hidden', !isCualEs);
   santiagoPortfolioEl.classList.toggle('hidden', isCualEs);
   cualesRulesEl.classList.toggle('hidden', !isCualEs);
+  if (logPanelBox) logPanelBox.classList.toggle('hidden', isCualEs);
 
   if (returnLobbyBtn) {
     returnLobbyBtn.classList.toggle('hidden', state.hostId !== myPlayerId);
@@ -1355,13 +1406,98 @@ function getActiveRentForTile(state, tile) {
   return null;
 }
 
+function renderCualEs3DStack(containerId, cardCount, maxCards = 55, maxLayers = 14) {
+  const stackEl = document.getElementById(containerId);
+  if (!stackEl) return;
+  stackEl.innerHTML = '';
+
+  const count = Math.max(0, Number(cardCount) || 0);
+  if (count <= 1) return;
+
+  const layers = Math.min(maxLayers, Math.max(1, Math.ceil(((count - 1) / maxCards) * maxLayers)));
+  for (let i = layers; i >= 1; i--) {
+    const layer = document.createElement('div');
+    layer.className = 'deck-3d-layer';
+    const offsetX = i * 1.1;
+    const offsetY = i * 2.1;
+    layer.style.transform = `translate3d(${offsetX}px, ${offsetY}px, -${i * 2}px)`;
+    stackEl.appendChild(layer);
+  }
+}
+
+function renderCualEsTableSeats(state) {
+  const seatsContainer = document.getElementById('cuales-table-seats');
+  if (!seatsContainer || !state.cualEs) return;
+  seatsContainer.innerHTML = '';
+
+  const ce = state.cualEs;
+  const opponents = state.players.filter((p) => p.id !== myPlayerId);
+  const me = state.players.find((p) => p.id === myPlayerId);
+
+  // Bordes alrededor de la pantalla para hasta 7 oponentes
+  const borderPositions = [
+    'pos-top',
+    'pos-left',
+    'pos-right',
+    'pos-top-left',
+    'pos-top-right',
+    'pos-bottom-left',
+    'pos-bottom-right'
+  ];
+
+  opponents.forEach((p, idx) => {
+    const posClass = borderPositions[idx % borderPositions.length];
+    const isPenalized = (ce.penalties?.[p.id] || 0) > Date.now();
+    const pScore = ce.scores?.[p.id] || 1;
+
+    const seat = document.createElement('div');
+    seat.id = `cuales-seat-${p.id}`;
+    seat.className = `cuales-seat ${posClass}` + (isPenalized ? ' seat-penalized' : '');
+    seat.style.borderColor = p.avatar?.color || '#38bdf8';
+    seat.innerHTML = `
+      <span class="cuales-seat-hand">${isPenalized ? '❄️' : '🫳'}</span>
+      <span class="cuales-seat-avatar">${p.avatar?.icon || '👤'}</span>
+      <div class="cuales-seat-info">
+        <span class="cuales-seat-name">${p.name}</span>
+        <span class="cuales-seat-score">${pScore} 🃏</span>
+      </div>
+    `;
+    seatsContainer.appendChild(seat);
+  });
+
+  if (me) {
+    const isMePenalized = (ce.penalties?.[me.id] || 0) > Date.now();
+    const myScore = ce.scores?.[me.id] || 1;
+    const mySeat = document.createElement('div');
+    mySeat.id = `cuales-seat-${me.id}`;
+    mySeat.className = `cuales-seat pos-bottom` + (isMePenalized ? ' seat-penalized' : '');
+    mySeat.style.borderColor = me.avatar?.color || '#38bdf8';
+    mySeat.innerHTML = `
+      <span class="cuales-seat-hand">${isMePenalized ? '❄️' : '🖐️'}</span>
+      <span class="cuales-seat-avatar">${me.avatar?.icon || '👤'}</span>
+      <div class="cuales-seat-info">
+        <span class="cuales-seat-name">${me.name} (Tú)</span>
+        <span class="cuales-seat-score">${myScore} 🃏</span>
+      </div>
+    `;
+    seatsContainer.appendChild(mySeat);
+  }
+}
+
 function renderCualEsGame(state) {
   const ce = state.cualEs;
   if (!ce) return;
 
-  document.getElementById('cuales-remaining-count').textContent = ce.remainingDeckCount || 0;
   const myScore = ce.scores?.[myPlayerId] || 1;
-  document.getElementById('cuales-my-score').textContent = myScore;
+  const myScoreEl = document.getElementById('cuales-my-score');
+  if (myScoreEl) myScoreEl.textContent = myScore;
+
+  // Renderizar montones 3D (el grosor del montón muestra cuántas cartas quedan sin usar números)
+  renderCualEs3DStack('cuales-deck-stack-layers', (ce.remainingDeckCount || 0) + (ce.centerCard?.length ? 1 : 0), 55, 14);
+  renderCualEs3DStack('cuales-my-stack-layers', myScore, 30, 10);
+
+  // Renderizar asientos y manos físicas en cada borde de la pantalla
+  renderCualEsTableSeats(state);
 
   const matchBanner = document.getElementById('cuales-last-match');
   if (state.status === 'finished' && state.winner) {

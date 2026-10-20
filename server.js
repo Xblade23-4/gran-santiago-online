@@ -1470,15 +1470,10 @@ function handleCualEsClick(room, player, symbolId) {
       timestamp: now
     };
 
-    addLog(
-      room,
-      `⚡ ¡${player.avatar.icon} ${player.name} encontró "${symObj.icon} ${symObj.name}"! (+1 carta, total: ${room.cualEs.scores[player.id]}).`,
-      'success'
-    );
-
     io.to(room.code).emit('cual_es_point', {
       playerId: player.id,
       playerName: player.name,
+      playerAvatar: player.avatar,
       symbol: symObj,
       score: room.cualEs.scores[player.id]
     });
@@ -1509,12 +1504,6 @@ function handleCualEsClick(room, player, symbolId) {
   // ¡ERROR! El jugador pulsó un dibujo que NO se repite entre su carta y la central -> 3 SEGUNDOS DE PENALIZACIÓN
   const newPenaltyUntil = now + 3000;
   room.cualEs.penalties[player.id] = newPenaltyUntil;
-
-  addLog(
-    room,
-    `❌ ${player.name} falló al pulsar "${symObj.icon} ${symObj.name}" y recibe 3 segundos de congelamiento.`,
-    'danger'
-  );
 
   io.to(room.code).emit('cual_es_penalty', {
     playerId: player.id,

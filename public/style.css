@@ -1663,11 +1663,11 @@ dialog.modern-dialog[open]:where(:not([data-closing]))::backdrop {
   width: 100%;
   height: 100%;
   background:
-    radial-gradient(circle at 50% 35%, rgba(37, 99, 235, 0.26), rgba(15, 23, 42, 0.95)),
+    radial-gradient(circle at 50% 45%, rgba(22, 101, 52, 0.35), rgba(15, 23, 42, 0.96)),
     #0b1324;
-  border: 3px solid #334155;
-  border-radius: 16px;
-  padding: 1.2rem;
+  border: 4px solid #334155;
+  border-radius: 18px;
+  padding: 3.4rem 2.2rem 3.4rem 2.2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1680,10 +1680,11 @@ dialog.modern-dialog[open]:where(:not([data-closing]))::backdrop {
 .cuales-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   width: 100%;
   max-width: 760px;
   gap: 1rem;
+  z-index: 6;
 }
 
 .cuales-title-badge {
@@ -1765,6 +1766,185 @@ dialog.modern-dialog[open]:where(:not([data-closing]))::backdrop {
   flex-direction: column;
   align-items: center;
   gap: 0.65rem;
+  z-index: 5;
+}
+
+.cuales-3d-deck-pile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 900px;
+  padding-bottom: 18px;
+  padding-right: 12px;
+}
+
+.cuales-deck-stack-layers {
+  position: absolute;
+  inset: 0 12px 18px 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.deck-3d-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #f8fafc, #cbd5e1);
+  border: 5px solid #d97706;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.45);
+}
+
+.cuales-deck-stack-layers.my-stack .deck-3d-layer {
+  border-color: #0284c7;
+}
+
+/* Asientos físicos en cada borde de la mesa con nombre, avatar y mano */
+.cuales-table-seats {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  overflow: hidden;
+}
+
+.cuales-seat {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 2px solid #38bdf8;
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: #f8fafc;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s ease;
+}
+
+.cuales-seat.seat-penalized {
+  border-color: #ef4444 !important;
+  background: rgba(127, 29, 29, 0.9);
+  filter: grayscale(0.4);
+}
+
+.cuales-seat-hand {
+  font-size: 1.55rem;
+  line-height: 1;
+  display: inline-block;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.cuales-seat.seat-grabbing .cuales-seat-hand {
+  transform: scale(1.45) translateY(-6px);
+}
+
+.cuales-seat-avatar {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.cuales-seat-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 1.1;
+}
+
+.cuales-seat-name {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.cuales-seat-score {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #facc15;
+}
+
+/* Posiciones en los bordes de la mesa */
+.cuales-seat.pos-top {
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.cuales-seat.pos-top .cuales-seat-hand {
+  transform: rotate(180deg);
+}
+
+.cuales-seat.pos-top-left {
+  top: 10px;
+  left: 14px;
+}
+.cuales-seat.pos-top-left .cuales-seat-hand {
+  transform: rotate(135deg);
+}
+
+.cuales-seat.pos-top-right {
+  top: 10px;
+  right: 14px;
+}
+.cuales-seat.pos-top-right .cuales-seat-hand {
+  transform: rotate(-135deg);
+}
+
+.cuales-seat.pos-left {
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+}
+.cuales-seat.pos-left .cuales-seat-hand {
+  transform: rotate(90deg);
+}
+
+.cuales-seat.pos-right {
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+}
+.cuales-seat.pos-right .cuales-seat-hand {
+  transform: rotate(-90deg);
+}
+
+.cuales-seat.pos-bottom-left {
+  bottom: 10px;
+  left: 14px;
+}
+.cuales-seat.pos-bottom-left .cuales-seat-hand {
+  transform: rotate(45deg);
+}
+
+.cuales-seat.pos-bottom-right {
+  bottom: 10px;
+  right: 14px;
+}
+.cuales-seat.pos-bottom-right .cuales-seat-hand {
+  transform: rotate(-45deg);
+}
+
+.cuales-seat.pos-bottom {
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 2.5px;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.55);
+}
+
+/* Carta voladora hacia el jugador que ganó el punto */
+.cuales-flying-card {
+  position: fixed;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #f1f5f9);
+  border: 6px solid #facc15;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), 0 0 25px rgba(250, 204, 21, 0.85);
+  pointer-events: none;
+  z-index: 9999;
+  transition:
+    transform 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.48s ease;
 }
 
 .cuales-card-label {
@@ -1786,9 +1966,10 @@ dialog.modern-dialog[open]:where(:not([data-closing]))::backdrop {
   background: radial-gradient(circle at 35% 30%, #ffffff, #f1f5f9);
   border: 8px solid #f59e0b;
   box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.65),
+    0 12px 30px rgba(0, 0, 0, 0.55),
     inset 0 0 20px rgba(0, 0, 0, 0.08);
   position: relative;
+  z-index: 4;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease, border-color 0.2s ease;
 }
 

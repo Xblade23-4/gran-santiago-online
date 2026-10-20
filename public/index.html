@@ -201,11 +201,11 @@
       <section class="board-wrapper">
         <!-- ARENA DEL JUEGO ¿CUÁL ES? -->
         <div id="cuales-arena" class="cuales-arena hidden">
+          <!-- Asientos físicos en los bordes de la mesa (nombre + avatar + mano) -->
+          <div id="cuales-table-seats" class="cuales-table-seats"></div>
+
           <div class="cuales-header">
-            <div class="cuales-title-badge">🔍 ¿CUÁL ES? • RAPIDEZ VISUAL</div>
-            <div class="cuales-deck-counter">
-              🃏 Cartas restantes en el mazo: <strong id="cuales-remaining-count">50</strong>
-            </div>
+            <div class="cuales-title-badge">🔍 ¿CUÁL ES? • MESA EN VIVO</div>
           </div>
 
           <div id="cuales-last-match" class="cuales-last-match">
@@ -222,18 +222,24 @@
           </div>
 
           <div class="cuales-cards-stage">
-            <!-- Carta Central -->
+            <!-- Carta Central sobre montón 3D -->
             <div class="cuales-card-wrapper">
-              <div class="cuales-card-label">🌟 CARTA CENTRAL (MAZO)</div>
-              <div id="cuales-center-card" class="cuales-circle-card center-deck-card"></div>
+              <div class="cuales-card-label">🌟 MONTÓN CENTRAL</div>
+              <div id="cuales-center-pile-3d" class="cuales-3d-deck-pile">
+                <div id="cuales-deck-stack-layers" class="cuales-deck-stack-layers"></div>
+                <div id="cuales-center-card" class="cuales-circle-card center-deck-card"></div>
+              </div>
             </div>
 
             <div class="cuales-vs-divider">⚡</div>
 
-            <!-- Mi Carta Activa -->
+            <!-- Mi Carta Activa sobre mi montón ganado -->
             <div class="cuales-card-wrapper">
-              <div class="cuales-card-label">👤 TU CARTA ACTIVA (<span id="cuales-my-score">1</span> ganadas)</div>
-              <div id="cuales-my-card" class="cuales-circle-card my-hand-card"></div>
+              <div class="cuales-card-label">🖐️ TU MANO (<span id="cuales-my-score">1</span> ganadas)</div>
+              <div id="cuales-my-pile-3d" class="cuales-3d-deck-pile">
+                <div id="cuales-my-stack-layers" class="cuales-deck-stack-layers my-stack"></div>
+                <div id="cuales-my-card" class="cuales-circle-card my-hand-card"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -294,7 +300,7 @@
 
       <!-- COLUMNA DERECHA: Crónica de Santiago y Chat en Vivo -->
       <aside class="sidebar sidebar-right">
-        <div class="panel-box log-panel">
+        <div id="log-panel-box" class="panel-box log-panel">
           <h3 class="panel-title">📰 Diario Financiero de Santiago</h3>
           <div id="game-logs" class="game-logs"></div>
         </div>
