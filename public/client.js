@@ -37,6 +37,9 @@ let selectedAvatarId = 'condorito';
 let currentRoomState = null;
 let lastKnownTurnPlayerId = null;
 let turnOverlayTimer = null;
+let displayedPositions = {}; // { [playerId]: tileIndex }
+let walkingTimers = {};      // { [playerId]: intervalId }
+let hoppingPlayers = new Set();
 let inspectedTileId = null;
 let soundEnabled = true;
 
@@ -78,6 +81,95 @@ function playSoundEffect(kind) {
     setTimeout(() => playTone(554.37, 0.09, 'triangle'), 80);
     setTimeout(() => playTone(659.25, 0.15, 'sine'), 165);
   }
+}
+
+// Sonido de paso individual por cada casilla caminada (con tono ascendente)
+function playStepSound(stepIndex = 0) {
+  const baseFreq = 290 + Math.min(stepIndex * 24, 360);
+  playTone(baseFreq, 0.075, 'triangle');
+}
+
+function renderTokensOnBoard(state) {
+  if (!state || !boardMeta.BOARD_TILES.length) return;
+  boardMeta.BOARD_TILES.forEach((tile) => {
+    const tokenContainer = document.getElementById(`tokens-tile-${tile.id}`);
+    if (tokenContainer) tokenContainer.innerHTML = '';
+  });
+
+  state.players.forEach((p) => {
+    if (p.bankrupt) return;
+    const pos = displayedPositions[p.id] !== undefined ? displayedPositions[p.id] : p.position;
+    const tokenContainer = document.getElementById(`tokens-tile-${pos}`);
+    if (tokenContainer) {
+      const tok = document.createElement('div');
+      const isMe = p.id === myPlayerId;
+      const isHopping = hoppingPlayers.has(p.id);
+      tok.className = 'board-token' +
+        (isMe ? ' is-me-token' : '') +
+        (isHopping ? ' token-hopping' : '');
+      tok.style.borderColor = p.avatar.color;
+      tok.title = `${p.name} (${formatCLP(p.money)})`;
+      tok.textContent = p.avatar.icon;
+      tokenContainer.appendChild(tok);
+    }
+  });
+}
+
+function animatePlayerMovement(player, fromPos, toPos) {
+  if (walkingTimers[player.id]) {
+    clearInterval(walkingTimers[player.id]);
+    delete walkingTimers[player.id];
+  }
+
+  // Calcular la ruta casilla por casilla
+  const steps = [];
+  const forwardDist = (toPos - fromPos + 40) % 40;
+  const backwardDist = (fromPos - toPos + 40) % 40;
+
+  if (forwardDist === 0) {
+    displayedPositions[player.id] = toPos;
+    renderTokensOnBoard(currentRoomState);
+    return;
+  }
+
+  // Si retrocede 3 casillas (ej: Taco en la Alameda)
+  if (backwardDist <= 4 && forwardDist > 30) {
+    for (let i = 1; i <= backwardDist; i++) {
+      steps.push((fromPos - i + 40) % 40);
+    }
+  } else {
+    for (let i = 1; i <= forwardDist; i++) {
+      steps.push((fromPos + i) % 40);
+    }
+  }
+
+  let stepIdx = 0;
+  walkingTimers[player.id] = setInterval(() => {
+    if (stepIdx >= steps.length) {
+      clearInterval(walkingTimers[player.id]);
+      delete walkingTimers[player.id];
+      hoppingPlayers.delete(player.id);
+      renderTokensOnBoard(currentRoomState);
+      return;
+    }
+
+    const nextTileId = steps[stepIdx];
+    displayedPositions[player.id] = nextTileId;
+    hoppingPlayers.add(player.id);
+
+    // Sonido por cada cuadro avanzado
+    playStepSound(stepIdx);
+
+    // Iluminar brevemente la casilla pisada
+    const tileEl = document.getElementById(`board-tile-${nextTileId}`);
+    if (tileEl) {
+      tileEl.classList.add('tile-step-highlight');
+      setTimeout(() => tileEl.classList.remove('tile-step-highlight'), 240);
+    }
+
+    renderTokensOnBoard(currentRoomState);
+    stepIdx += 1;
+  }, 190);
 }
 
 // Detección de transición discreta de display y cierre animado de <dialog> (Top Layer)
@@ -707,11 +799,8 @@ function renderGame(state) {
     playersList.appendChild(row);
   });
 
-  // Actualizar fichas y estado de propiedades en el tablero
+  // Actualizar estado de propiedades en el tablero
   boardMeta.BOARD_TILES.forEach((tile) => {
-    const tokenContainer = document.getElementById(`tokens-tile-${tile.id}`);
-    if (tokenContainer) tokenContainer.innerHTML = '';
-
     const prop = state.properties[tile.id];
     const ownerDot = document.getElementById(`owner-dot-${tile.id}`);
     const mortgagedTag = document.getElementById(`mortgaged-tag-${tile.id}`);
@@ -744,18 +833,18 @@ function renderGame(state) {
     }
   });
 
+  // Detectar si algún jugador caminó de una casilla a otra para animarlo cuadro por cuadro
   state.players.forEach((p) => {
     if (p.bankrupt) return;
-    const tokenContainer = document.getElementById(`tokens-tile-${p.position}`);
-    if (tokenContainer) {
-      const tok = document.createElement('div');
-      tok.className = 'board-token';
-      tok.style.borderColor = p.avatar.color;
-      tok.title = `${p.name} (${formatCLP(p.money)})`;
-      tok.textContent = p.avatar.icon;
-      tokenContainer.appendChild(tok);
+    const prevPos = displayedPositions[p.id];
+    if (prevPos === undefined) {
+      displayedPositions[p.id] = p.position;
+    } else if (prevPos !== p.position && !walkingTimers[p.id]) {
+      animatePlayerMovement(p, prevPos, p.position);
     }
   });
+
+  renderTokensOnBoard(state);
 
   // Mis Propiedades
   renderMyProperties(state);
