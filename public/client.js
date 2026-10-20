@@ -39,6 +39,9 @@ let selectedGameType = 'santiago';
 let currentRoomState = null;
 let myPenaltyUntil = 0;
 let penaltyIntervalId = null;
+let cualesCardTransitionUntil = 0;
+let cualesTransitionTimer = null;
+let lastRenderedCualEsDeckCount = null;
 let lastKnownTurnPlayerId = null;
 let turnOverlayTimer = null;
 let displayedPositions = {}; // { [playerId]: tileIndex }
@@ -1050,7 +1053,7 @@ function renderCualEsCircleCard(containerId, symbolIds, cardSeed = 0) {
     `;
 
     btn.addEventListener('click', () => {
-      if (Date.now() < myPenaltyUntil) return;
+      if (Date.now() < myPenaltyUntil || Date.now() < cualesCardTransitionUntil) return;
       socket.emit('cual_es_click', { symbolId: symId }, (res) => {
         if (res && res.penalized && res.penaltyUntil) {
           startMyPenaltyCountdown(res.penaltyUntil);
@@ -1375,12 +1378,45 @@ function renderCualEsGame(state) {
     startMyPenaltyCountdown(serverPenalty);
   }
 
-  // Renderizar Carta Central y Mi Carta Activa
+  // Renderizar Carta Central y Mi Carta Activa (con animación de 0.5s al cambiar carta para evitar clics accidentales)
   const centerCard = ce.centerCard || [];
   const myCard = ce.playerCards?.[myPlayerId] || [];
+  const centerEl = document.getElementById('cuales-center-card');
+  const myCardEl = document.getElementById('cuales-my-card');
 
-  renderCualEsCircleCard('cuales-center-card', centerCard, ce.remainingDeckCount || 1);
-  renderCualEsCircleCard('cuales-my-card', myCard, myScore);
+  const cardChanged =
+    lastRenderedCualEsDeckCount !== null &&
+    lastRenderedCualEsDeckCount !== ce.remainingDeckCount;
+  lastRenderedCualEsDeckCount = ce.remainingDeckCount;
+
+  if (cardChanged) {
+    cualesCardTransitionUntil = Date.now() + 500;
+    if (centerEl) {
+      centerEl.classList.remove('cuales-card-changing');
+      void centerEl.offsetWidth;
+      centerEl.classList.add('cuales-card-changing');
+    }
+    if (myCardEl) {
+      myCardEl.classList.remove('cuales-card-changing');
+      void myCardEl.offsetWidth;
+      myCardEl.classList.add('cuales-card-changing');
+    }
+
+    if (cualesTransitionTimer) clearTimeout(cualesTransitionTimer);
+    // Actualizar los dibujos en la mitad del giro (200ms) y habilitar clics al terminar los 0.5s (500ms)
+    setTimeout(() => {
+      renderCualEsCircleCard('cuales-center-card', centerCard, ce.remainingDeckCount || 1);
+      renderCualEsCircleCard('cuales-my-card', myCard, myScore);
+    }, 200);
+
+    cualesTransitionTimer = setTimeout(() => {
+      if (centerEl) centerEl.classList.remove('cuales-card-changing');
+      if (myCardEl) myCardEl.classList.remove('cuales-card-changing');
+    }, 500);
+  } else {
+    renderCualEsCircleCard('cuales-center-card', centerCard, ce.remainingDeckCount || 1);
+    renderCualEsCircleCard('cuales-my-card', myCard, myScore);
+  }
 
   // Lista lateral de jugadores ordenada por puntaje en ¿Cuál es?
   const playersList = document.getElementById('players-list');

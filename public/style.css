@@ -1802,6 +1802,26 @@ dialog.modern-dialog[open]:where(:not([data-closing]))::backdrop {
   pointer-events: none;
 }
 
+.cuales-circle-card.cuales-card-changing {
+  pointer-events: none !important;
+  animation: cualesCardSwap 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes cualesCardSwap {
+  0% {
+    transform: scale(1) rotateY(0deg);
+    filter: brightness(1);
+  }
+  40% {
+    transform: scale(0.78) rotateY(90deg);
+    filter: brightness(1.15);
+  }
+  100% {
+    transform: scale(1) rotateY(0deg);
+    filter: brightness(1);
+  }
+}
+
 .cuales-vs-divider {
   font-size: 2.2rem;
   background: rgba(255, 255, 255, 0.08);

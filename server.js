@@ -1497,6 +1497,15 @@ function handleCualEsClick(room, player, symbolId) {
     return { ok: true, match: true, symbol: symObj };
   }
 
+  // Ignorar clics residuales durante los 0.5s de transición de carta sobre el símbolo recién ganado
+  if (
+    room.cualEs.lastMatch &&
+    now - room.cualEs.lastMatch.timestamp < 500 &&
+    room.cualEs.lastMatch.symbol?.id === symbolId
+  ) {
+    return { ok: false, match: false, penalized: false, transitioning: true };
+  }
+
   // ¡ERROR! El jugador pulsó un dibujo que NO se repite entre su carta y la central -> 3 SEGUNDOS DE PENALIZACIÓN
   const newPenaltyUntil = now + 3000;
   room.cualEs.penalties[player.id] = newPenaltyUntil;
