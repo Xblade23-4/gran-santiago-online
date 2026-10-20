@@ -451,7 +451,10 @@ function buildBoardDOM() {
         <div class="tile-color-bar" id="bar-tile-${tile.id}" style="background:${barColor}">${barInitialIcon}</div>
         <div class="tile-name">${tile.shortName || tile.name}</div>
         ${tile.icon ? `<div class="${hasBadgeIcon ? 'tile-center-badge' : 'tile-icon'}" style="border-color:${barColor}">${tile.icon}</div>` : ''}
-        <div class="tile-price">${tile.price ? formatCompactCLP(tile.price) : (tile.taxAmount ? '-' + formatCompactCLP(tile.taxAmount) : '')}</div>
+        <div class="tile-meta-footer">
+          <div class="tile-price" id="price-tile-${tile.id}">${tile.price ? formatCompactCLP(tile.price) : (tile.taxAmount ? '-' + formatCompactCLP(tile.taxAmount) : '')}</div>
+          <div class="tile-rent-tag hidden" id="rent-tag-tile-${tile.id}"></div>
+        </div>
         <div class="tile-tokens" id="tokens-tile-${tile.id}"></div>
         <div class="tile-owner-dot hidden" id="owner-dot-${tile.id}"></div>
         <div class="tile-mortgaged-tag hidden" id="mortgaged-tag-${tile.id}">HIPOTECADA</div>
@@ -1118,8 +1121,13 @@ function renderGame(state) {
       const tile = boardMeta.BOARD_TILES[state.pendingBuyTileId];
       if (tile) {
         buyBox.classList.remove('hidden');
+        const extraDetails = tile.type === 'property'
+          ? `<div style="font-size:0.75rem; color:#cbd5e1; margin-top:4px;">💸 Arriendo base: <strong>${formatCLP(tile.rents[0])}</strong> · 🏗️ Mejora Casa/Hotel: <strong>${formatCLP(tile.houseCost)}</strong> <button type="button" onclick="openPropertyModal(${tile.id})" class="btn btn-xs btn-secondary" style="margin-left:4px; padding:1px 6px;">Ver Carta</button></div>`
+          : (tile.type === 'station'
+            ? `<div style="font-size:0.75rem; color:#cbd5e1; margin-top:4px;">💸 Cobro 1–4 estaciones: <strong>${formatCompactCLP(tile.rents[0])} a ${formatCompactCLP(tile.rents[3])}</strong></div>`
+            : '');
         document.getElementById('buy-prompt-text').innerHTML =
-          `¿Comprar <strong>${tile.name}</strong> por <span style="color:#4ade80">${formatCLP(tile.price)}</span>?`;
+          `¿Comprar <strong>${tile.name}</strong> por <span style="color:#4ade80">${formatCLP(tile.price)}</span>?${extraDetails}`;
       }
     } else if (state.turnPhase === 'END_TURN') {
       endBtn.classList.remove('hidden');
@@ -1159,6 +1167,7 @@ function renderGame(state) {
     const ownerDot = document.getElementById(`owner-dot-${tile.id}`);
     const mortgagedTag = document.getElementById(`mortgaged-tag-${tile.id}`);
     const barEl = document.getElementById(`bar-tile-${tile.id}`);
+    const rentTagEl = document.getElementById(`rent-tag-tile-${tile.id}`);
 
     if (prop) {
       if (prop.ownerId) {
@@ -1167,8 +1176,17 @@ function renderGame(state) {
           ownerDot.style.backgroundColor = owner.avatar.color;
           ownerDot.classList.remove('hidden');
         }
-      } else if (ownerDot) {
-        ownerDot.classList.add('hidden');
+        const activeRent = getActiveRentForTile(state, tile);
+        if (rentTagEl && activeRent) {
+          rentTagEl.textContent = `Cobro: ${formatCompactCLP(activeRent)}`;
+          rentTagEl.classList.remove('hidden');
+          rentTagEl.classList.toggle('upgraded-rent', (prop.houses || 0) > 0);
+        } else if (rentTagEl) {
+          rentTagEl.classList.add('hidden');
+        }
+      } else {
+        if (ownerDot) ownerDot.classList.add('hidden');
+        if (rentTagEl) rentTagEl.classList.add('hidden');
       }
 
       if (mortgagedTag) {
@@ -1177,9 +1195,9 @@ function renderGame(state) {
 
       if (barEl && tile.type === 'property') {
         if (prop.houses === 5) {
-          barEl.innerHTML = '🏙️';
+          barEl.innerHTML = `<span class="tile-house-pill hotel-pill">🏨 HOTEL</span>`;
         } else if (prop.houses > 0) {
-          barEl.innerHTML = '🏠'.repeat(prop.houses);
+          barEl.innerHTML = `<span class="tile-house-pill">${'🏠'.repeat(prop.houses)} ${prop.houses}</span>`;
         } else {
           barEl.innerHTML = '';
         }
@@ -1208,6 +1226,33 @@ function renderGame(state) {
 
   // Crónica Financiera y Chat
   renderLogsAndChat(state);
+}
+
+// Calcula en el cliente cuánto paga quien caiga en una casilla actualmente
+function getActiveRentForTile(state, tile) {
+  if (!state || !tile) return null;
+  const prop = state.properties?.[tile.id];
+  if (!prop || !prop.ownerId || prop.mortgaged) return null;
+
+  const ownerId = prop.ownerId;
+  if (tile.type === 'property') {
+    const houses = prop.houses || 0;
+    if (houses > 0) return tile.rents[houses];
+    const groupTiles = boardMeta.BOARD_TILES.filter((t) => t.group === tile.group);
+    const hasMonopoly =
+      groupTiles.length > 0 &&
+      groupTiles.every((t) => state.properties?.[t.id]?.ownerId === ownerId && !state.properties?.[t.id]?.mortgaged);
+    return hasMonopoly ? tile.rents[0] * 2 : tile.rents[0];
+  }
+
+  if (tile.type === 'station') {
+    const ownedStations = boardMeta.BOARD_TILES.filter(
+      (t) => t.type === 'station' && state.properties?.[t.id]?.ownerId === ownerId && !state.properties?.[t.id]?.mortgaged
+    ).length;
+    return tile.rents[Math.max(0, Math.min(3, ownedStations - 1))] || 50000;
+  }
+
+  return null;
 }
 
 function renderCualEsGame(state) {
@@ -1291,15 +1336,28 @@ function renderMyProperties(state) {
     item.style.borderLeftColor = groupColor;
 
     let badge = '';
-    if (prop.mortgaged) badge = '🏦 Hipotecada';
-    else if (prop.houses === 5) badge = '🏙️ Torre';
-    else if (prop.houses > 0) badge = `🏠x${prop.houses}`;
+    if (prop.mortgaged) badge = '<span style="color:#ef4444; font-weight:900;">🏦 Hipotecada</span>';
+    else if (prop.houses === 5) badge = '<span class="tile-house-pill hotel-pill" style="position:static;">🏨 HOTEL</span>';
+    else if (prop.houses > 0) badge = `<span class="tile-house-pill" style="position:static;">${'🏠'.repeat(prop.houses)} (${prop.houses})</span>`;
+
+    const activeRent = getActiveRentForTile(state, tile);
+    const rentStr = prop.mortgaged
+      ? 'Sin cobro'
+      : (activeRent ? `Cobro: ${formatCompactCLP(activeRent)}` : (tile.type === 'utility' ? 'Cobro: ×Dados' : ''));
+    const upgradeStr = tile.type === 'property' && tile.houseCost
+      ? ` · Mejora: ${formatCompactCLP(tile.houseCost)}`
+      : '';
 
     const typeIcon = tile.type === 'station' ? '🚇 ' : (tile.type === 'utility' ? `${tile.icon || '⚡'} ` : '🏘️ ');
 
     item.innerHTML = `
-      <span><strong>${typeIcon}${tile.name}</strong></span>
-      <span style="color:#0284c7; font-weight:800; font-size:0.75rem">${badge || formatCompactCLP(tile.price)}</span>
+      <div style="display:flex; flex-direction:column; gap:2px;">
+        <span><strong>${typeIcon}${tile.name}</strong></span>
+        <span style="font-size:0.7rem; color:#0369a1; font-weight:700;">💸 ${rentStr}${upgradeStr}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:4px;">
+        ${badge || `<span style="color:#475569; font-weight:800; font-size:0.75rem">${formatCompactCLP(tile.price)}</span>`}
+      </div>
     `;
     item.addEventListener('click', () => openPropertyModal(tile.id));
     myPropsContainer.appendChild(item);
@@ -1371,6 +1429,9 @@ function openPropertyModal(tileId) {
   const titleEl = document.getElementById('prop-dialog-title');
   const priceEl = document.getElementById('prop-dialog-price');
   const ownerEl = document.getElementById('prop-dialog-owner');
+  const upgradeBox = document.getElementById('prop-upgrade-box');
+  const upgradeCostEl = document.getElementById('prop-dialog-upgrade-cost');
+  const currentRentEl = document.getElementById('prop-dialog-current-rent');
   const rentTable = document.querySelector('#prop-rent-table tbody');
   const descEl = document.getElementById('prop-dialog-desc');
   const actionsBox = document.getElementById('prop-owner-actions');
@@ -1396,40 +1457,104 @@ function openPropertyModal(tileId) {
   const propState = currentRoomState?.properties?.[tileId];
   if (propState) {
     const owner = currentRoomState.players.find((p) => p.id === propState.ownerId);
+    let buildStatus = '';
+    if (propState.houses === 5) buildStatus = ' · 🏨 CON HOTEL';
+    else if (propState.houses > 0) buildStatus = ` · ${'🏠'.repeat(propState.houses)} (${propState.houses} casa${propState.houses > 1 ? 's' : ''})`;
     ownerEl.textContent = owner
-      ? `Dueño: ${owner.avatar.icon} ${owner.name} ${propState.mortgaged ? '(HIPOTECADA)' : ''}`
+      ? `Dueño: ${owner.avatar.icon} ${owner.name}${buildStatus} ${propState.mortgaged ? '(HIPOTECADA)' : ''}`
       : '🟢 Disponible en Conservador de Bienes Raíces';
   } else {
     ownerEl.textContent = 'Casilla Pública de Santiago';
   }
 
-  if (tile.type === 'property') {
-    const labels = [
-      'Arriendo Sitio Sin Edificar',
-      'Con 1 Casa 🏠',
-      'Con 2 Casas 🏠🏠',
-      'Con 3 Casas 🏠🏠🏠',
-      'Con 4 Casas 🏠🏠🏠🏠',
-      'Con Torre Costanera (Hotel) 🏙️'
-    ];
-    tile.rents.forEach((r, i) => {
-      const tr = document.createElement('tr');
-      if (propState && propState.houses === i && propState.ownerId) {
-        tr.style.background = 'rgba(56, 189, 248, 0.18)';
+  // Mostrar resumen de Precio de Mejora y Cobro Actual
+  if (upgradeBox) {
+    if (tile.type === 'property' || tile.type === 'station' || tile.type === 'utility') {
+      upgradeBox.classList.remove('hidden');
+      if (upgradeCostEl) {
+        upgradeCostEl.textContent = tile.type === 'property' && tile.houseCost
+          ? `${formatCLP(tile.houseCost)} c/u`
+          : 'No edificable';
       }
-      tr.innerHTML = `<td>${labels[i]}</td><td>${formatCLP(r)}</td>`;
+      if (currentRentEl) {
+        const activeRent = getActiveRentForTile(currentRoomState, tile);
+        if (propState?.mortgaged) {
+          currentRentEl.textContent = '$0 (Hipotecada)';
+        } else if (activeRent) {
+          currentRentEl.textContent = formatCLP(activeRent);
+        } else if (tile.type === 'property') {
+          currentRentEl.textContent = `${formatCLP(tile.rents[0])} (Base)`;
+        } else if (tile.type === 'station') {
+          currentRentEl.textContent = `${formatCLP(tile.rents[0])} (1 Est.)`;
+        } else if (tile.type === 'utility') {
+          currentRentEl.textContent = '4.000 × Dados';
+        }
+      }
+    } else {
+      upgradeBox.classList.add('hidden');
+    }
+  }
+
+  if (tile.type === 'property') {
+    const headTr = document.createElement('tr');
+    headTr.style.background = '#e2e8f0';
+    headTr.innerHTML = `<td style="font-weight:900; color:#1e293b;">Nivel de Edificación</td><td style="font-weight:900; color:#1e293b;">Paga quien caiga</td>`;
+    rentTable.appendChild(headTr);
+
+    const ownerId = propState?.ownerId;
+    const groupTiles = boardMeta.BOARD_TILES.filter((t) => t.group === tile.group);
+    const hasMonopoly =
+      ownerId &&
+      groupTiles.length > 0 &&
+      groupTiles.every((t) => currentRoomState?.properties?.[t.id]?.ownerId === ownerId && !currentRoomState?.properties?.[t.id]?.mortgaged);
+
+    const rows = [
+      { label: 'Sitio Sin Edificar (Base)', amount: tile.rents[0], isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 0 && !hasMonopoly) },
+      { label: 'Con Villa Completa (Monopolio 2×)', amount: tile.rents[0] * 2, isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 0 && hasMonopoly) },
+      { label: 'Con 1 Casa 🏠', amount: tile.rents[1], isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 1) },
+      { label: 'Con 2 Casas 🏠🏠', amount: tile.rents[2], isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 2) },
+      { label: 'Con 3 Casas 🏠🏠🏠', amount: tile.rents[3], isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 3) },
+      { label: 'Con 4 Casas 🏠🏠🏠🏠', amount: tile.rents[4], isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 4) },
+      { label: 'Con Hotel (Torre) 🏨', amount: tile.rents[5], isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 5) }
+    ];
+
+    rows.forEach((r) => {
+      const tr = document.createElement('tr');
+      if (r.isCurrent) tr.className = 'active-rent-row';
+      const activeBadge = r.isCurrent ? ' <span style="font-size:0.68rem; background:#0284c7; color:#fff; padding:1px 5px; border-radius:999px;">ACTUAL</span>' : '';
+      tr.innerHTML = `<td>${r.label}${activeBadge}</td><td>${formatCLP(r.amount)}</td>`;
       rentTable.appendChild(tr);
     });
+
     const buildTr = document.createElement('tr');
-    buildTr.innerHTML = `<td><strong>Costo Edificación Casa/Torre</strong></td><td>${formatCLP(tile.houseCost)}</td>`;
+    buildTr.style.borderTop = '2px solid #cbd5e1';
+    buildTr.innerHTML = `<td><strong>🏗️ Precio Mejora (Casa o Hotel)</strong></td><td><strong>${formatCLP(tile.houseCost)} c/u</strong></td>`;
     rentTable.appendChild(buildTr);
   } else if (tile.type === 'station') {
+    const headTr = document.createElement('tr');
+    headTr.style.background = '#e2e8f0';
+    headTr.innerHTML = `<td style="font-weight:900; color:#1e293b;">Cantidad de Estaciones</td><td style="font-weight:900; color:#1e293b;">Paga quien caiga</td>`;
+    rentTable.appendChild(headTr);
+
+    const ownerId = propState?.ownerId;
+    const ownedStations = ownerId
+      ? boardMeta.BOARD_TILES.filter((t) => t.type === 'station' && currentRoomState?.properties?.[t.id]?.ownerId === ownerId && !currentRoomState?.properties?.[t.id]?.mortgaged).length
+      : 0;
+
     tile.rents.forEach((r, i) => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>🚇 Con ${i + 1} Estación(es) de Metro</td><td>${formatCLP(r)}</td>`;
+      const isCurrent = Boolean(ownerId && !propState.mortgaged && ownedStations === i + 1);
+      if (isCurrent) tr.className = 'active-rent-row';
+      const activeBadge = isCurrent ? ' <span style="font-size:0.68rem; background:#0284c7; color:#fff; padding:1px 5px; border-radius:999px;">ACTUAL</span>' : '';
+      tr.innerHTML = `<td>🚇 Con ${i + 1} Estación(es) de Metro${activeBadge}</td><td>${formatCLP(r)}</td>`;
       rentTable.appendChild(tr);
     });
   } else if (tile.type === 'utility') {
+    const headTr = document.createElement('tr');
+    headTr.style.background = '#e2e8f0';
+    headTr.innerHTML = `<td style="font-weight:900; color:#1e293b;">Servicios Poseídos</td><td style="font-weight:900; color:#1e293b;">Paga quien caiga</td>`;
+    rentTable.appendChild(headTr);
+
     const uIcon = tile.icon || '⚡';
     [
       { label: `${uIcon} Con 1 Servicio Básico`, val: '4.000 × Dados' },
@@ -1444,9 +1569,20 @@ function openPropertyModal(tileId) {
   // Mostrar controles si el jugador es el propietario
   if (propState && propState.ownerId === myPlayerId && currentRoomState?.status === 'playing') {
     actionsBox.classList.remove('hidden');
-    document.getElementById('btn-build-house').style.display = tile.type === 'property' ? 'inline-flex' : 'none';
-    document.getElementById('btn-sell-house').style.display =
+    const buildBtn = document.getElementById('btn-build-house');
+    const sellBtn = document.getElementById('btn-sell-house');
+    if (tile.type === 'property') {
+      buildBtn.style.display = propState.houses < 5 ? 'inline-flex' : 'none';
+      const nextUpgradeLabel = propState.houses === 4 ? '🏨 Construir Hotel' : '🏠 Construir Casa';
+      buildBtn.textContent = `${nextUpgradeLabel} (${formatCLP(tile.houseCost)})`;
+    } else {
+      buildBtn.style.display = 'none';
+    }
+    sellBtn.style.display =
       tile.type === 'property' && propState.houses > 0 ? 'inline-flex' : 'none';
+    if (tile.type === 'property' && propState.houses > 0) {
+      sellBtn.textContent = `🔨 Vender Mejora (+${formatCLP(Math.floor(tile.houseCost / 2))})`;
+    }
     document.getElementById('btn-toggle-mortgage').textContent = propState.mortgaged
       ? `🏦 Levantar Hipoteca (${formatCLP(Math.floor(tile.price * 0.55))})`
       : `🏦 Hipotecar (+${formatCLP(Math.floor(tile.price / 2))})`;

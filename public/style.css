@@ -708,16 +708,67 @@ select:focus {
 }
 
 .tile-color-bar {
-  height: 14px;
+  height: 18px;
   width: 100%;
   border-radius: 3px 3px 1px 1px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+  border-bottom: 1.5px solid rgba(0, 0, 0, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 2px;
+  font-size: 0.72rem;
+  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.tile-house-pill {
+  background: rgba(15, 23, 42, 0.85);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-size: clamp(0.54rem, 0.68vw, 0.68rem);
+  font-weight: 900;
+  line-height: 1.15;
+  display: inline-flex;
+  align-items: center;
   gap: 1px;
-  font-size: 0.58rem;
-  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.tile-house-pill.hotel-pill {
+  background: linear-gradient(135deg, #f59e0b, #dc2626);
+  border-color: #fde047;
+  color: #fff;
+}
+
+.tile-meta-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+}
+
+.tile-rent-tag {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(0.44rem, 0.56vw, 0.58rem);
+  font-weight: 800;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 3px;
+  padding: 0 2px;
+  text-align: center;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tile-rent-tag.upgraded-rent {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #b45309;
+  font-weight: 900;
 }
 
 .tile-name {
@@ -1316,9 +1367,9 @@ dialog.modern-dialog[open]:where(:not([data-closing]))::backdrop {
   align-items: center;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
-  padding: 0.6rem 0.9rem;
+  padding: 0.55rem 0.9rem;
   border-radius: 8px;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.55rem;
   color: #334155;
   font-weight: 700;
 }
@@ -1327,6 +1378,74 @@ dialog.modern-dialog[open]:where(:not([data-closing]))::backdrop {
   color: #059669;
   font-size: 1.15rem;
   font-weight: 900;
+}
+
+.prop-upgrade-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.upgrade-col {
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  padding: 0.48rem 0.6rem;
+  text-align: center;
+}
+
+.upgrade-col span {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #1e40af;
+  text-transform: uppercase;
+}
+
+.upgrade-col strong {
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 900;
+  color: #1d4ed8;
+  margin-top: 2px;
+}
+
+.upgrade-col.current-rent-col {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.upgrade-col.current-rent-col span {
+  color: #92400e;
+}
+
+.upgrade-col.current-rent-col strong {
+  color: #b45309;
+}
+
+.rent-table th {
+  text-align: left;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: #475569;
+  padding: 0.35rem 0.45rem;
+  border-bottom: 2px solid #cbd5e1;
+  background: #f1f5f9;
+}
+
+.rent-table th:last-child {
+  text-align: right;
+}
+
+.rent-table tr.active-rent-row {
+  background: #fef08a !important;
+  font-weight: 900;
+}
+
+.rent-table tr.active-rent-row td {
+  color: #0f172a;
+  border-bottom-color: #eab308;
 }
 
 .prop-owner-badge {
