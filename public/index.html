@@ -13,6 +13,16 @@
   <!-- Notificaciones flotantes (Toasts) -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
+  <!-- Animación cinemática de Cambio de Turno -->
+  <div id="turn-transition-overlay" class="turn-transition-overlay hidden" aria-hidden="true">
+    <div class="turn-transition-card" id="turn-transition-card">
+      <div class="tt-badge">🚇 CAMBIO DE TURNO EN SANTIAGO</div>
+      <div class="tt-avatar" id="tt-avatar">🦅</div>
+      <h2 class="tt-name" id="tt-name">Nombre Jugador</h2>
+      <p class="tt-sub" id="tt-sub">¡Prepárate para lanzar los dados!</p>
+    </div>
+  </div>
+
   <!-- ================= PANTALLA DE BIENVENIDA / SALAS ONLINE ================= -->
   <main id="screen-auth" class="screen active">
     <div class="hero-backdrop"></div>
@@ -292,6 +302,24 @@
           <button type="submit" class="btn btn-primary">📨 Enviar Oferta</button>
         </div>
       </form>
+    </div>
+  </dialog>
+
+  <!-- ================= MODAL NATIVO: TARJETA SACADA (¡ALÓ SANTIAGO! / POLLA CHILENA) ================= -->
+  <dialog id="drawn-card-dialog" closedby="any" aria-labelledby="drawn-card-title" class="modern-dialog">
+    <div class="dialog-card white-deed-card">
+      <div id="drawn-card-header" class="prop-dialog-header">
+        <span id="drawn-card-deck" class="prop-comuna">¡ALÓ SANTIAGO!</span>
+        <h3 id="drawn-card-title">Título de la Tarjeta</h3>
+      </div>
+      <div class="prop-dialog-body drawn-card-body">
+        <div id="drawn-card-icon" class="drawn-card-big-icon">🃏</div>
+        <p id="drawn-card-player" class="drawn-card-player">Sacada por Jugador</p>
+        <p id="drawn-card-text" class="drawn-card-text">Texto de la tarjeta...</p>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" id="btn-close-drawn-card" class="btn btn-primary btn-block">¡Entendido!</button>
+      </div>
     </div>
   </dialog>
 

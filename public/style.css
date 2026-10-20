@@ -632,16 +632,21 @@ select:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(30, 41, 59, 0.7);
+  background: #ffffff;
+  color: #0f172a;
   border-radius: 6px;
-  padding: 0.38rem 0.55rem;
+  padding: 0.42rem 0.6rem;
   cursor: pointer;
   font-size: 0.8rem;
-  border-left: 5px solid #94a3b8;
+  border: 1px solid #cbd5e1;
+  border-left: 7px solid #94a3b8;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .my-prop-item:hover {
-  background: rgba(51, 65, 85, 0.85);
+  transform: translateX(3px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.28);
 }
 
 /* ================= TABLERO 11x11 GRAN SANTIAGO ================= */
@@ -659,19 +664,20 @@ select:focus {
   grid-template-rows: 1.28fr repeat(9, 1fr) 1.28fr;
   width: min(calc(100vh - 1.4rem), calc(100vw - 630px));
   height: min(calc(100vh - 1.4rem), calc(100vw - 630px));
-  background: #0f172a;
-  border: 3px solid #334155;
+  background: #1e293b;
+  border: 4px solid #334155;
   border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65);
   gap: 2px;
-  padding: 2px;
+  padding: 3px;
   position: relative;
 }
 
 .board-tile {
-  background: #1e293b;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 4px;
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -680,17 +686,21 @@ select:focus {
   cursor: pointer;
   user-select: none;
   overflow: hidden;
-  transition: transform 0.12s, border-color 0.15s, background 0.15s;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s ease, border-color 0.15s ease;
 }
 
 .board-tile:hover {
-  border-color: #38bdf8;
-  background: #26354d;
-  z-index: 4;
+  transform: scale(1.06);
+  border-color: #0284c7;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  z-index: 6;
 }
 
 .board-tile.corner-tile {
-  background: linear-gradient(145deg, #1e293b, #0f172a);
+  background: linear-gradient(145deg, #ffffff, #f1f5f9);
+  color: #0f172a;
+  border: 2px solid #94a3b8;
   align-items: center;
   justify-content: center;
   text-align: center;
@@ -698,22 +708,24 @@ select:focus {
 }
 
 .tile-color-bar {
-  height: 11px;
+  height: 14px;
   width: 100%;
-  border-radius: 2px;
+  border-radius: 3px 3px 1px 1px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 1px;
-  font-size: 0.56rem;
+  font-size: 0.58rem;
+  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .tile-name {
   font-size: clamp(0.5rem, 0.68vw, 0.68rem);
-  font-weight: 700;
+  font-weight: 800;
   text-align: center;
   line-height: 1.08;
-  color: #f1f5f9;
+  color: #0f172a;
   padding: 1px 2px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -730,8 +742,11 @@ select:focus {
 .tile-price {
   font-family: 'Outfit', sans-serif;
   font-size: clamp(0.48rem, 0.62vw, 0.64rem);
-  font-weight: 800;
-  color: #93c5fd;
+  font-weight: 900;
+  color: #1e293b;
+  background: #f1f5f9;
+  border-radius: 3px;
+  padding: 0 2px;
   text-align: center;
 }
 
@@ -739,22 +754,22 @@ select:focus {
   position: absolute;
   bottom: 2px;
   right: 2px;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  border: 1px solid #fff;
+  border: 1.5px solid #0f172a;
 }
 
 .tile-mortgaged-tag {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.72);
+  background: rgba(255, 255, 255, 0.86);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.55rem;
   font-weight: 900;
-  color: #f87171;
+  color: #dc2626;
   letter-spacing: 0.04em;
   pointer-events: none;
 }
@@ -931,18 +946,139 @@ select:focus {
 .last-card-banner {
   width: 100%;
   max-width: 360px;
-  background: rgba(30, 41, 59, 0.9);
-  border: 1px solid rgba(250, 204, 21, 0.4);
-  border-radius: 10px;
-  padding: 0.55rem 0.8rem;
-  font-size: 0.76rem;
+  background: #ffffff;
+  color: #0f172a;
+  border: 2px solid #cbd5e1;
+  border-top: 6px solid #f59e0b;
+  border-radius: 12px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.78rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+}
+
+.last-card-banner.card-flip-anim {
+  animation: cardDrawFlip 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes cardDrawFlip {
+  0% {
+    opacity: 0;
+    transform: perspective(600px) rotateY(90deg) scale(0.75);
+  }
+  65% {
+    opacity: 1;
+    transform: perspective(600px) rotateY(-8deg) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(600px) rotateY(0deg) scale(1);
+  }
 }
 
 .card-badge {
-  font-size: 0.65rem;
-  font-weight: 800;
-  color: #facc15;
+  font-size: 0.66rem;
+  font-weight: 900;
+  color: #d97706;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ================= ANIMACIÓN DE CAMBIO DE TURNO ================= */
+.turn-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(15, 23, 42, 0.65) 0%, rgba(2, 6, 23, 0.2) 75%);
+  animation: fadeOverlay 1.6s ease-out forwards;
+}
+
+.turn-transition-card {
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 20px;
+  padding: 1.4rem 2.4rem;
+  text-align: center;
+  border: 3px solid #cbd5e1;
+  border-top: 10px solid #2563eb;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65);
+  animation: slideTurnBanner 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.tt-badge {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #475569;
+  margin-bottom: 0.35rem;
+}
+
+.tt-avatar {
+  font-size: 3.1rem;
+  line-height: 1.1;
+  margin-bottom: 0.25rem;
+  animation: bounceAvatar 0.6s ease-out;
+}
+
+.tt-name {
+  font-size: 1.55rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.tt-sub {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #334155;
+  margin-top: 0.2rem;
+}
+
+@keyframes slideTurnBanner {
+  0% {
+    opacity: 0;
+    transform: translateY(-45px) scale(0.82);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1.03);
+  }
+  30% {
+    transform: translateY(0) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(25px) scale(0.92);
+  }
+}
+
+@keyframes fadeOverlay {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes bounceAvatar {
+  0% { transform: scale(0.4) rotate(-12deg); }
+  70% { transform: scale(1.18) rotate(6deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+.turn-banner.turn-pulse {
+  animation: bannerPulse 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes bannerPulse {
+  0% { transform: scale(0.88); }
+  50% { transform: scale(1.08); box-shadow: 0 0 22px rgba(56, 189, 248, 0.6); }
+  100% { transform: scale(1); }
 }
 
 /* ================= BITÁCORA Y CHAT ================= */
@@ -1005,71 +1141,113 @@ select:focus {
   gap: 0.4rem;
 }
 
-/* ================= DIALOGS NATIVOS (<dialog closedby="any">) ================= */
+/* ================= DIALOGS NATIVOS (<dialog closedby="any">) — TARJETAS DE ESCRITURA BLANCAS ================= */
 dialog.modern-dialog {
   margin: auto;
   border: none;
-  border-radius: 16px;
+  border-radius: 18px;
   background: transparent;
-  color: var(--text-main);
+  color: #0f172a;
   max-width: 440px;
   width: 92%;
   padding: 0;
+  opacity: 0;
+  transform: perspective(700px) rotateX(14deg) scale(0.88);
+  transition-property: opacity, transform, display, overlay;
+  transition-duration: 0.32s;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition-behavior: allow-discrete;
 }
 
 dialog.modern-dialog::backdrop {
+  background-color: rgba(2, 6, 23, 0);
+  backdrop-filter: blur(0px);
+  transition-property: background-color, backdrop-filter, display, overlay;
+  transition-duration: 0.3s;
+  transition-timing-function: ease-out;
+  transition-behavior: allow-discrete;
+}
+
+dialog.modern-dialog[open]:where(:not([data-closing])) {
+  opacity: 1;
+  transform: perspective(700px) rotateX(0deg) scale(1);
+
+  @starting-style {
+    opacity: 0;
+    transform: perspective(700px) rotateX(-18deg) scale(0.84);
+  }
+}
+
+dialog.modern-dialog[open]:where(:not([data-closing]))::backdrop {
   background-color: rgba(2, 6, 23, 0.72);
   backdrop-filter: blur(4px);
+
+  @starting-style {
+    background-color: rgba(2, 6, 23, 0);
+    backdrop-filter: blur(0px);
+  }
 }
 
 .dialog-card {
-  background: #0f172a;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 16px;
+  background: #ffffff;
+  color: #0f172a;
+  border: 3px solid #e2e8f0;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65);
 }
 
 .prop-dialog-header {
-  padding: 1.1rem 1.25rem;
+  padding: 1.15rem 1.25rem;
   text-align: center;
   background: #334155;
-  color: #fff;
+  color: #ffffff;
+  border-bottom: 3px solid rgba(0, 0, 0, 0.14);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .prop-comuna {
   font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  opacity: 0.9;
+  letter-spacing: 0.09em;
+  opacity: 0.95;
 }
 
 .prop-dialog-body {
-  padding: 1.2rem;
+  padding: 1.25rem;
+  background: #ffffff;
+  color: #0f172a;
 }
 
 .prop-price-tag {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(30, 41, 59, 0.8);
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
   padding: 0.6rem 0.9rem;
   border-radius: 8px;
   margin-bottom: 0.75rem;
+  color: #334155;
+  font-weight: 700;
 }
 
 .prop-price-tag strong {
-  color: #4ade80;
-  font-size: 1.1rem;
+  color: #059669;
+  font-size: 1.15rem;
+  font-weight: 900;
 }
 
 .prop-owner-badge {
   text-align: center;
   font-size: 0.82rem;
-  padding: 0.4rem;
+  font-weight: 700;
+  padding: 0.45rem;
   border-radius: 6px;
-  background: rgba(51, 65, 85, 0.5);
+  background: #f1f5f9;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
   margin-bottom: 0.85rem;
 }
 
@@ -1078,24 +1256,26 @@ dialog.modern-dialog::backdrop {
   border-collapse: collapse;
   font-size: 0.84rem;
   margin-bottom: 0.85rem;
+  color: #1e293b;
 }
 
 .rent-table td {
-  padding: 0.36rem 0.4rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  padding: 0.4rem 0.45rem;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .rent-table td:last-child {
   text-align: right;
-  font-weight: 700;
-  color: #f8fafc;
+  font-weight: 800;
+  color: #0f172a;
 }
 
 .prop-desc {
-  font-size: 0.83rem;
-  color: var(--text-muted);
+  font-size: 0.85rem;
+  color: #475569;
   text-align: center;
   margin-bottom: 0.75rem;
+  line-height: 1.45;
 }
 
 .prop-owner-actions {
@@ -1106,12 +1286,48 @@ dialog.modern-dialog::backdrop {
 }
 
 .dialog-footer {
-  padding: 0.75rem 1.2rem;
-  background: rgba(15, 23, 42, 0.9);
-  border-top: 1px solid var(--border-glass);
+  padding: 0.8rem 1.2rem;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+
+.dialog-footer .btn-ghost {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Modal de Tarjeta Sacada (¡Aló Santiago! / Polla Chilena) */
+.drawn-card-body {
+  text-align: center;
+  padding: 1.5rem 1.4rem;
+}
+
+.drawn-card-big-icon {
+  font-size: 3.4rem;
+  margin-bottom: 0.4rem;
+  animation: bounceAvatar 0.65s ease-out;
+}
+
+.drawn-card-player {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.65rem;
+}
+
+.drawn-card-text {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.45;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 0.9rem;
 }
 
 .trade-columns {
@@ -1122,7 +1338,8 @@ dialog.modern-dialog::backdrop {
 }
 
 .trade-col {
-  background: rgba(30, 41, 59, 0.6);
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
   padding: 0.7rem;
   border-radius: 8px;
   display: flex;
@@ -1132,12 +1349,37 @@ dialog.modern-dialog::backdrop {
 
 .trade-col h4 {
   font-size: 0.84rem;
-  color: #38bdf8;
+  color: #1d4ed8;
 }
 
 .trade-col label {
   font-size: 0.74rem;
-  color: var(--text-muted);
+  color: #475569;
+  font-weight: 600;
+}
+
+#trade-dialog select,
+#trade-dialog input {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #94a3b8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog.modern-dialog,
+  .board-tile,
+  .turn-transition-card,
+  .last-card-banner.card-flip-anim {
+    transform: none !important;
+    animation-duration: 0.1s !important;
+    transition-duration: 0.1s !important;
+  }
+
+  @starting-style {
+    dialog.modern-dialog[open]:where(:not([data-closing])) {
+      transform: none;
+    }
+  }
 }
 
 /* Toasts */

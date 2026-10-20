@@ -35,6 +35,8 @@ localStorage.setItem('gso_playerId', myPlayerId);
 
 let selectedAvatarId = 'condorito';
 let currentRoomState = null;
+let lastKnownTurnPlayerId = null;
+let turnOverlayTimer = null;
 let inspectedTileId = null;
 let soundEnabled = true;
 
@@ -69,8 +71,82 @@ function playSoundEffect(kind) {
     setTimeout(() => playTone(659.25, 0.12, 'sine'), 100);
     setTimeout(() => playTone(783.99, 0.18, 'sine'), 210);
   } else if (kind === 'turn') {
-    playTone(587.33, 0.14, 'sine');
+    playTone(587.33, 0.12, 'sine');
+    setTimeout(() => playTone(783.99, 0.16, 'sine'), 110);
+  } else if (kind === 'card') {
+    playTone(440, 0.08, 'triangle');
+    setTimeout(() => playTone(554.37, 0.09, 'triangle'), 80);
+    setTimeout(() => playTone(659.25, 0.15, 'sine'), 165);
   }
+}
+
+// Detección de transición discreta de display y cierre animado de <dialog> (Top Layer)
+let supportsDisplayTransition;
+function canTransitionDisplay() {
+  if (supportsDisplayTransition !== undefined) return supportsDisplayTransition;
+  if (!window.CSS?.supports?.('transition-behavior', 'allow-discrete') || !document.body) {
+    return false;
+  }
+  const probe = document.createElement('div');
+  probe.style.cssText = 'transition: display 1s allow-discrete !important; display: block;';
+  document.body.appendChild(probe);
+  getComputedStyle(probe).display;
+  probe.style.display = 'none';
+  supportsDisplayTransition = getComputedStyle(probe).display === 'block';
+  probe.remove();
+  return supportsDisplayTransition;
+}
+
+function supportsTopLayerExit() {
+  return window.CSS?.supports?.('overlay', 'auto') && canTransitionDisplay();
+}
+
+async function closeTopLayer(element) {
+  if (!element || !element.open) return;
+  if (!supportsTopLayerExit()) {
+    element.setAttribute('data-closing', '');
+    const animations = element.getAnimations({ subtree: true });
+    if (animations.length > 0) {
+      await Promise.race([
+        Promise.allSettled(animations.map((a) => a.finished)),
+        new Promise((r) => setTimeout(r, 2000))
+      ]);
+    }
+    if (!element.hasAttribute('data-closing')) return;
+    element.removeAttribute('data-closing');
+  }
+  element.close();
+}
+
+function triggerTurnChangeAnimation(player, isMyTurn) {
+  playSoundEffect('turn');
+  const overlay = document.getElementById('turn-transition-overlay');
+  const card = document.getElementById('turn-transition-card');
+  const avatarEl = document.getElementById('tt-avatar');
+  const nameEl = document.getElementById('tt-name');
+  const subEl = document.getElementById('tt-sub');
+
+  if (!overlay || !card || !player) return;
+
+  card.style.borderTopColor = player.avatar?.color || '#2563eb';
+  avatarEl.textContent = player.avatar?.icon || '🎲';
+  nameEl.textContent = isMyTurn ? `¡Es tu turno, ${player.name}!` : `Turno de ${player.name}`;
+  subEl.textContent = isMyTurn
+    ? '¡Lanza los dados y conquista las comunas de Santiago!'
+    : `Saldo disponible: ${formatCLP(player.money)}`;
+
+  overlay.classList.remove('hidden');
+  // Reiniciar la animación CSS
+  card.style.animation = 'none';
+  overlay.style.animation = 'none';
+  void card.offsetWidth;
+  card.style.animation = '';
+  overlay.style.animation = '';
+
+  if (turnOverlayTimer) clearTimeout(turnOverlayTimer);
+  turnOverlayTimer = setTimeout(() => {
+    overlay.classList.add('hidden');
+  }, 1600);
 }
 
 function showToast(text) {
@@ -98,9 +174,13 @@ function getGridPosition(tileId) {
   return { row: 1 + (tileId - 30), col: 11 };
 }
 
-// Fallback para light-dismiss en navegadores sin soporte nativo de <dialog closedby="any">
+// Fallback para light-dismiss y cierre animado en navegadores
 function setupDialogLightDismiss(dialog) {
   if (!dialog) return;
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeTopLayer(dialog);
+  });
   if (!('closedBy' in HTMLDialogElement.prototype)) {
     dialog.addEventListener('click', (event) => {
       if (event.target !== dialog) return;
@@ -112,7 +192,7 @@ function setupDialogLightDismiss(dialog) {
         event.clientX <= rect.left + rect.width
       );
       if (isDialogContent) return;
-      dialog.close();
+      closeTopLayer(dialog);
     });
   }
 }
@@ -121,6 +201,7 @@ function setupDialogLightDismiss(dialog) {
 async function initApp() {
   setupDialogLightDismiss(document.getElementById('property-dialog'));
   setupDialogLightDismiss(document.getElementById('trade-dialog'));
+  setupDialogLightDismiss(document.getElementById('drawn-card-dialog'));
 
   const res = await fetch('/api/board');
   boardMeta = await res.json();
@@ -178,7 +259,12 @@ function buildBoardDOM() {
     tileEl.style.gridColumn = pos.col;
 
     const groupInfo = tile.group ? boardMeta.COLOR_GROUPS[tile.group] : null;
-    const barColor = groupInfo ? groupInfo.color : 'transparent';
+    const specialColors = {
+      chance: '#f97316',
+      community: '#16a34a',
+      tax: '#475569'
+    };
+    const barColor = groupInfo ? groupInfo.color : (specialColors[tile.type] || '#64748b');
 
     if (isCorner) {
       tileEl.innerHTML = `
@@ -317,7 +403,12 @@ function bindUIEvents() {
 
   // Modal de Propiedad
   document.getElementById('btn-close-prop-dialog').addEventListener('click', () => {
-    document.getElementById('property-dialog').close();
+    closeTopLayer(document.getElementById('property-dialog'));
+  });
+
+  // Modal de Tarjeta Sacada
+  document.getElementById('btn-close-drawn-card').addEventListener('click', () => {
+    closeTopLayer(document.getElementById('drawn-card-dialog'));
   });
 
   document.getElementById('btn-build-house').addEventListener('click', () => {
@@ -350,7 +441,7 @@ function bindUIEvents() {
   // Modal de Negociación / Trueque
   document.getElementById('btn-open-trade').addEventListener('click', openTradeModal);
   document.getElementById('btn-close-trade-dialog').addEventListener('click', () => {
-    document.getElementById('trade-dialog').close();
+    closeTopLayer(document.getElementById('trade-dialog'));
   });
 
   document.getElementById('trade-target-player').addEventListener('change', populateTradeTargetProperties);
@@ -370,7 +461,7 @@ function bindUIEvents() {
         if (res && !res.ok) showToast(res.error);
         else {
           showToast('Oferta enviada a la Bolsa de Comercio');
-          document.getElementById('trade-dialog').close();
+          closeTopLayer(document.getElementById('trade-dialog'));
         }
       }
     );
@@ -419,13 +510,28 @@ socket.on('public_rooms', (roomsList) => {
 });
 
 socket.on('room_state', (state) => {
+  const prevTurnId = lastKnownTurnPlayerId;
+  const activePlayer = state.players[state.turnIndex];
   currentRoomState = state;
+
   if (state.status === 'lobby') {
+    lastKnownTurnPlayerId = null;
     switchScreen('screen-lobby');
     renderLobby(state);
   } else {
     switchScreen('screen-game');
     renderGame(state);
+
+    if (state.status === 'playing' && activePlayer && activePlayer.id !== prevTurnId) {
+      lastKnownTurnPlayerId = activePlayer.id;
+      triggerTurnChangeAnimation(activePlayer, activePlayer.id === myPlayerId);
+      const turnBanner = document.getElementById('turn-banner');
+      if (turnBanner) {
+        turnBanner.classList.remove('turn-pulse');
+        void turnBanner.offsetWidth;
+        turnBanner.classList.add('turn-pulse');
+      }
+    }
   }
 });
 
@@ -445,12 +551,36 @@ socket.on('dice_rolled', ({ dice }) => {
   }, 240);
 });
 
-socket.on('card_drawn', ({ playerName, deckTitle, card }) => {
+socket.on('card_drawn', ({ playerName, deckType, deckTitle, card }) => {
+  playSoundEffect('card');
+
+  const isChance = deckType === 'chance';
+  const headerColor = isChance ? '#f97316' : '#16a34a';
+
+  // Actualizar banner en el centro del tablero con animación 3D Flip
   const banner = document.getElementById('last-card-banner');
-  banner.classList.remove('hidden');
-  document.getElementById('card-banner-deck').textContent = `${deckTitle} • ${playerName}`;
+  banner.classList.remove('hidden', 'card-flip-anim');
+  banner.style.borderTopColor = headerColor;
+  void banner.offsetWidth;
+  banner.classList.add('card-flip-anim');
+
+  const badgeEl = document.getElementById('card-banner-deck');
+  badgeEl.style.color = headerColor;
+  badgeEl.textContent = `${deckTitle} • ${playerName}`;
   document.getElementById('card-banner-title').textContent = card.title;
   document.getElementById('card-banner-text').textContent = card.text;
+
+  // Abrir modal emergente de tarjeta con animación de entrada
+  const cardDialog = document.getElementById('drawn-card-dialog');
+  if (cardDialog) {
+    document.getElementById('drawn-card-header').style.background = headerColor;
+    document.getElementById('drawn-card-deck').textContent = deckTitle;
+    document.getElementById('drawn-card-title').textContent = card.title;
+    document.getElementById('drawn-card-icon').textContent = isChance ? '❓' : '🍀';
+    document.getElementById('drawn-card-player').textContent = `Tarjeta sacada por ${playerName}`;
+    document.getElementById('drawn-card-text').textContent = card.text;
+    if (!cardDialog.open) cardDialog.showModal();
+  }
 });
 
 function renderLobby(state) {
@@ -665,7 +795,7 @@ function renderMyProperties(state) {
 
     item.innerHTML = `
       <span><strong>${tile.name}</strong></span>
-      <span style="color:#93c5fd; font-size:0.75rem">${badge || formatCompactCLP(tile.price)}</span>
+      <span style="color:#0284c7; font-weight:800; font-size:0.75rem">${badge || formatCompactCLP(tile.price)}</span>
     `;
     item.addEventListener('click', () => openPropertyModal(tile.id));
     myPropsContainer.appendChild(item);
