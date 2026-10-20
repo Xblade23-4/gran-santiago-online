@@ -40,13 +40,89 @@ let turnOverlayTimer = null;
 let displayedPositions = {}; // { [playerId]: tileIndex }
 let walkingTimers = {};      // { [playerId]: intervalId }
 let hoppingPlayers = new Set();
+let isDiceRollingAnim = false;
+let pendingRoomStateAfterDice = null;
+let pendingCardAfterDice = null;
+let diceIntervalId = null;
 let inspectedTileId = null;
 let soundEnabled = true;
+let musicEnabled = true;
+let bgmIntervalId = null;
+let bgmNoteIndex = 0;
 
-// Efectos de sonido sintetizados (Web Audio API sin archivos externos)
+// Efectos de sonido y Música de Fondo sintetizados (Web Audio API sin archivos externos)
 const audioCtx = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)
   ? new (window.AudioContext || window.webkitAudioContext)()
   : null;
+
+// Melodía alegre estilo Juego de Mesa / Lounge Santiaguino
+const BGM_MELODY = [
+  { f: 261.63, b: 196.00 }, // C4 + G3
+  { f: 329.63, b: 0 },      // E4
+  { f: 392.00, b: 130.81 }, // G4 + C3
+  { f: 523.25, b: 0 },      // C5
+  { f: 392.00, b: 196.00 }, // G4 + G3
+  { f: 329.63, b: 0 },      // E4
+  { f: 349.23, b: 174.61 }, // F4 + F3
+  { f: 440.00, b: 0 },      // A4
+  { f: 523.25, b: 130.81 }, // C5 + C3
+  { f: 440.00, b: 0 },      // A4
+  { f: 392.00, b: 196.00 }, // G4 + G3
+  { f: 329.63, b: 0 },      // E4
+  { f: 293.66, b: 146.83 }, // D4 + D3
+  { f: 349.23, b: 0 },      // F4
+  { f: 392.00, b: 196.00 }, // G4 + G3
+  { f: 493.88, b: 0 }       // B4
+];
+
+function startBackgroundMusic() {
+  if (!musicEnabled || !audioCtx || bgmIntervalId) return;
+  try {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (_) {}
+
+  bgmIntervalId = setInterval(() => {
+    if (!musicEnabled || !audioCtx || audioCtx.state !== 'running') return;
+    const step = BGM_MELODY[bgmNoteIndex % BGM_MELODY.length];
+    bgmNoteIndex += 1;
+
+    try {
+      // Nota melódica suave
+      if (step.f) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(step.f, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.018, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0008, audioCtx.currentTime + 0.34);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.35);
+      }
+      // Bajo suave de acompañamiento
+      if (step.b) {
+        const bass = audioCtx.createOscillator();
+        const bGain = audioCtx.createGain();
+        bass.type = 'triangle';
+        bass.frequency.setValueAtTime(step.b, audioCtx.currentTime);
+        bGain.gain.setValueAtTime(0.022, audioCtx.currentTime);
+        bGain.gain.exponentialRampToValueAtTime(0.0008, audioCtx.currentTime + 0.45);
+        bass.connect(bGain);
+        bGain.connect(audioCtx.destination);
+        bass.start();
+        bass.stop(audioCtx.currentTime + 0.46);
+      }
+    } catch (_) {}
+  }, 380);
+}
+
+function stopBackgroundMusic() {
+  if (bgmIntervalId) {
+    clearInterval(bgmIntervalId);
+    bgmIntervalId = null;
+  }
+}
 
 function playTone(freq = 440, duration = 0.12, type = 'sine') {
   if (!soundEnabled || !audioCtx) return;
@@ -476,6 +552,31 @@ function bindUIEvents() {
     socket.emit('end_turn');
   });
 
+  // Iniciar música de fondo automáticamente al primer clic del usuario
+  const unlockAudio = () => {
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    if (musicEnabled) {
+      startBackgroundMusic();
+    }
+    document.removeEventListener('click', unlockAudio);
+  };
+  document.addEventListener('click', unlockAudio);
+
+  // Música de Fondo
+  document.getElementById('btn-toggle-music').addEventListener('click', (e) => {
+    musicEnabled = !musicEnabled;
+    e.currentTarget.textContent = musicEnabled ? '🎵' : '🔕';
+    if (musicEnabled) {
+      startBackgroundMusic();
+      showToast('🎵 Música de fondo activada');
+    } else {
+      stopBackgroundMusic();
+      showToast('🔕 Música de fondo en pausa');
+    }
+  });
+
   // Sonido
   document.getElementById('btn-toggle-sound').addEventListener('click', (e) => {
     soundEnabled = !soundEnabled;
@@ -601,7 +702,7 @@ socket.on('public_rooms', (roomsList) => {
   });
 });
 
-socket.on('room_state', (state) => {
+function applyIncomingRoomState(state) {
   const prevTurnId = lastKnownTurnPlayerId;
   const activePlayer = state.players[state.turnIndex];
   currentRoomState = state;
@@ -625,25 +726,71 @@ socket.on('room_state', (state) => {
       }
     }
   }
+}
+
+socket.on('room_state', (state) => {
+  if (isDiceRollingAnim && state.status === 'playing') {
+    pendingRoomStateAfterDice = state;
+    return;
+  }
+  applyIncomingRoomState(state);
 });
 
 const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 
 socket.on('dice_rolled', ({ dice }) => {
-  playSoundEffect('dice');
+  isDiceRollingAnim = true;
   const d1 = document.getElementById('die-1');
   const d2 = document.getElementById('die-2');
+  const rollBtn = document.getElementById('btn-roll-dice');
+  if (rollBtn) rollBtn.classList.add('hidden');
+
   d1.classList.add('rolling');
   d2.classList.add('rolling');
+
+  if (diceIntervalId) clearInterval(diceIntervalId);
+
+  // Cambiar caras de los dados y sonar agitando durante 2 segundos (2000 ms)
+  let tick = 0;
+  diceIntervalId = setInterval(() => {
+    const r1 = Math.floor(Math.random() * 6);
+    const r2 = Math.floor(Math.random() * 6);
+    d1.textContent = DICE_FACES[r1];
+    d2.textContent = DICE_FACES[r2];
+    if (tick % 2 === 0) {
+      playTone(260 + (tick * 18) % 240, 0.055, 'triangle');
+    }
+    tick += 1;
+  }, 110);
+
   setTimeout(() => {
+    if (diceIntervalId) {
+      clearInterval(diceIntervalId);
+      diceIntervalId = null;
+    }
     d1.textContent = DICE_FACES[(dice[0] || 1) - 1];
     d2.textContent = DICE_FACES[(dice[1] || 1) - 1];
     d1.classList.remove('rolling');
     d2.classList.remove('rolling');
-  }, 240);
+    playTone(587.33, 0.14, 'sine');
+
+    isDiceRollingAnim = false;
+
+    if (pendingRoomStateAfterDice) {
+      const st = pendingRoomStateAfterDice;
+      pendingRoomStateAfterDice = null;
+      applyIncomingRoomState(st);
+    }
+
+    if (pendingCardAfterDice) {
+      const cd = pendingCardAfterDice;
+      pendingCardAfterDice = null;
+      showDrawnCardNotification(cd);
+    }
+  }, 2000);
 });
 
-socket.on('card_drawn', ({ playerName, deckType, deckTitle, card }) => {
+function showDrawnCardNotification({ playerName, deckType, deckTitle, card }) {
   playSoundEffect('card');
 
   const isChance = deckType === 'chance';
@@ -673,6 +820,14 @@ socket.on('card_drawn', ({ playerName, deckType, deckTitle, card }) => {
     document.getElementById('drawn-card-text').textContent = card.text;
     if (!cardDialog.open) cardDialog.showModal();
   }
+}
+
+socket.on('card_drawn', (payload) => {
+  if (isDiceRollingAnim) {
+    pendingCardAfterDice = payload;
+    return;
+  }
+  showDrawnCardNotification(payload);
 });
 
 function renderLobby(state) {
