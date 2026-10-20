@@ -1,0 +1,858 @@
+/**
+ * Cliente Oficial "Gran Santiago Online" (2 a 8 Jugadores)
+ * Economía en Pesos Chilenos ($ CLP)
+ */
+
+const socket = io();
+
+// Formateador oficial de Pesos Chilenos ($ CLP)
+const clpFormatter = new Intl.NumberFormat('es-CL', {
+  style: 'currency',
+  currency: 'CLP',
+  maximumFractionDigits: 0
+});
+
+function formatCLP(amount) {
+  return clpFormatter.format(Number(amount) || 0);
+}
+
+function formatCompactCLP(amount) {
+  const n = Number(amount) || 0;
+  if (n >= 1000000) return `$${(n / 1000000).toFixed(1).replace('.0', '')}M`;
+  if (n >= 1000) return `$${Math.round(n / 1000)}k`;
+  return `$${n}`;
+}
+
+// Estado global del cliente
+let boardMeta = {
+  COLOR_GROUPS: {},
+  PLAYER_AVATARS: [],
+  BOARD_TILES: []
+};
+
+let myPlayerId = localStorage.getItem('gso_playerId') || ('p_' + Math.random().toString(36).substring(2, 10));
+localStorage.setItem('gso_playerId', myPlayerId);
+
+let selectedAvatarId = 'condorito';
+let currentRoomState = null;
+let inspectedTileId = null;
+let soundEnabled = true;
+
+// Efectos de sonido sintetizados (Web Audio API sin archivos externos)
+const audioCtx = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)
+  ? new (window.AudioContext || window.webkitAudioContext)()
+  : null;
+
+function playTone(freq = 440, duration = 0.12, type = 'sine') {
+  if (!soundEnabled || !audioCtx) return;
+  try {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (_) {}
+}
+
+function playSoundEffect(kind) {
+  if (kind === 'dice') {
+    playTone(320, 0.08, 'triangle');
+    setTimeout(() => playTone(480, 0.1, 'triangle'), 90);
+  } else if (kind === 'buy') {
+    playTone(523.25, 0.1, 'sine');
+    setTimeout(() => playTone(659.25, 0.12, 'sine'), 100);
+    setTimeout(() => playTone(783.99, 0.18, 'sine'), 210);
+  } else if (kind === 'turn') {
+    playTone(587.33, 0.14, 'sine');
+  }
+}
+
+function showToast(text) {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = text;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.remove();
+  }, 3600);
+}
+
+// Posición en la grilla 11x11 para cada una de las 40 casillas
+function getGridPosition(tileId) {
+  if (tileId >= 0 && tileId <= 10) {
+    return { row: 11, col: 11 - tileId };
+  }
+  if (tileId >= 11 && tileId <= 20) {
+    return { row: 11 - (tileId - 10), col: 1 };
+  }
+  if (tileId >= 21 && tileId <= 30) {
+    return { row: 1, col: 1 + (tileId - 20) };
+  }
+  return { row: 1 + (tileId - 30), col: 11 };
+}
+
+// Fallback para light-dismiss en navegadores sin soporte nativo de <dialog closedby="any">
+function setupDialogLightDismiss(dialog) {
+  if (!dialog) return;
+  if (!('closedBy' in HTMLDialogElement.prototype)) {
+    dialog.addEventListener('click', (event) => {
+      if (event.target !== dialog) return;
+      const rect = dialog.getBoundingClientRect();
+      const isDialogContent = (
+        rect.top <= event.clientY &&
+        event.clientY <= rect.top + rect.height &&
+        rect.left <= event.clientX &&
+        event.clientX <= rect.left + rect.width
+      );
+      if (isDialogContent) return;
+      dialog.close();
+    });
+  }
+}
+
+// Inicialización al cargar la página
+async function initApp() {
+  setupDialogLightDismiss(document.getElementById('property-dialog'));
+  setupDialogLightDismiss(document.getElementById('trade-dialog'));
+
+  const res = await fetch('/api/board');
+  boardMeta = await res.json();
+
+  renderAvatarSelector();
+  buildBoardDOM();
+  bindUIEvents();
+
+  // Autocompletar nombre guardado o código por URL (?sala=STGO-XXXX)
+  const savedName = localStorage.getItem('gso_playerName');
+  if (savedName) {
+    document.getElementById('input-player-name').value = savedName;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const roomParam = params.get('sala');
+  if (roomParam) {
+    document.getElementById('input-room-code').value = roomParam.toUpperCase();
+    showToast(`Código de invitación detectado: ${roomParam.toUpperCase()}`);
+  }
+}
+
+function renderAvatarSelector() {
+  const container = document.getElementById('avatar-selector');
+  container.innerHTML = '';
+  boardMeta.PLAYER_AVATARS.forEach((av, idx) => {
+    if (idx === 0) selectedAvatarId = av.id;
+    const div = document.createElement('div');
+    div.className = 'avatar-option' + (av.id === selectedAvatarId ? ' selected' : '');
+    div.innerHTML = `
+      <span class="av-icon">${av.icon}</span>
+      <span class="av-name">${av.name}</span>
+    `;
+    div.addEventListener('click', () => {
+      selectedAvatarId = av.id;
+      document.querySelectorAll('.avatar-option').forEach((el) => el.classList.remove('selected'));
+      div.classList.add('selected');
+    });
+    container.appendChild(div);
+  });
+}
+
+function buildBoardDOM() {
+  const grid = document.getElementById('board-grid');
+  // Eliminar casillas previas conservando .board-center
+  grid.querySelectorAll('.board-tile').forEach((el) => el.remove());
+
+  boardMeta.BOARD_TILES.forEach((tile) => {
+    const pos = getGridPosition(tile.id);
+    const tileEl = document.createElement('div');
+    const isCorner = [0, 10, 20, 30].includes(tile.id);
+    tileEl.className = 'board-tile' + (isCorner ? ' corner-tile' : '');
+    tileEl.id = `board-tile-${tile.id}`;
+    tileEl.style.gridRow = pos.row;
+    tileEl.style.gridColumn = pos.col;
+
+    const groupInfo = tile.group ? boardMeta.COLOR_GROUPS[tile.group] : null;
+    const barColor = groupInfo ? groupInfo.color : 'transparent';
+
+    if (isCorner) {
+      tileEl.innerHTML = `
+        <div class="tile-icon">${tile.icon || '📍'}</div>
+        <div class="tile-name">${tile.shortName || tile.name}</div>
+        <div class="tile-tokens" id="tokens-tile-${tile.id}"></div>
+      `;
+    } else {
+      tileEl.innerHTML = `
+        <div class="tile-color-bar" id="bar-tile-${tile.id}" style="background:${barColor}"></div>
+        <div class="tile-name">${tile.shortName || tile.name}</div>
+        ${tile.icon ? `<div class="tile-icon" style="font-size:0.95rem">${tile.icon}</div>` : ''}
+        <div class="tile-price">${tile.price ? formatCompactCLP(tile.price) : (tile.taxAmount ? '-' + formatCompactCLP(tile.taxAmount) : '')}</div>
+        <div class="tile-tokens" id="tokens-tile-${tile.id}"></div>
+        <div class="tile-owner-dot hidden" id="owner-dot-${tile.id}"></div>
+        <div class="tile-mortgaged-tag hidden" id="mortgaged-tag-${tile.id}">HIPOTECADA</div>
+      `;
+    }
+
+    tileEl.addEventListener('click', () => openPropertyModal(tile.id));
+    grid.appendChild(tileEl);
+  });
+}
+
+function switchScreen(screenId) {
+  document.querySelectorAll('.screen').forEach((sc) => sc.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+}
+
+function bindUIEvents() {
+  // Crear sala
+  document.getElementById('btn-create-room').addEventListener('click', () => {
+    const playerName = document.getElementById('input-player-name').value.trim() || 'Santiaguino';
+    const startingMoney = Number(document.getElementById('select-starting-money').value) || 1500000;
+    localStorage.setItem('gso_playerName', playerName);
+
+    socket.emit(
+      'create_room',
+      { playerName, avatarId: selectedAvatarId, startingMoney, playerId: myPlayerId },
+      (res) => {
+        if (res && res.ok) {
+          window.history.replaceState({}, '', `?sala=${res.roomCode}`);
+        } else {
+          showToast(res?.error || 'Error al crear sala');
+        }
+      }
+    );
+  });
+
+  // Unirse por código
+  document.getElementById('btn-join-code').addEventListener('click', () => {
+    const code = document.getElementById('input-room-code').value.trim().toUpperCase();
+    if (!code) {
+      showToast('Ingresa un código de sala (ej: STGO-XXXX)');
+      return;
+    }
+    joinRoomByCode(code);
+  });
+
+  document.getElementById('btn-refresh-rooms').addEventListener('click', () => {
+    socket.emit('get_public_rooms');
+    showToast('Lista de salas actualizada');
+  });
+
+  // Copiar link de invitación
+  const copyInviteLink = () => {
+    if (!currentRoomState) return;
+    const url = `${window.location.origin}/?sala=${currentRoomState.code}`;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast(`¡Enlace copiado! Compártelo: ${url}`);
+    });
+  };
+  document.getElementById('btn-copy-link').addEventListener('click', copyInviteLink);
+  document.getElementById('btn-copy-game-link').addEventListener('click', copyInviteLink);
+
+  document.getElementById('btn-leave-lobby').addEventListener('click', () => {
+    window.location.href = '/';
+  });
+
+  // Agregar Bot en el Lobby
+  document.getElementById('btn-add-bot').addEventListener('click', () => {
+    socket.emit('add_bot', {}, (res) => {
+      if (res && !res.ok) showToast(res.error);
+    });
+  });
+
+  // Iniciar partida
+  document.getElementById('btn-start-game').addEventListener('click', () => {
+    socket.emit('start_game', {}, (res) => {
+      if (res && !res.ok) showToast(res.error);
+    });
+  });
+
+  // Controles de turno en el tablero
+  document.getElementById('btn-roll-dice').addEventListener('click', () => {
+    socket.emit('roll_dice');
+  });
+
+  document.getElementById('btn-pay-bail').addEventListener('click', () => {
+    socket.emit('pay_bail', {}, (res) => {
+      if (res && !res.ok) showToast(res.error);
+    });
+  });
+
+  document.getElementById('btn-buy-prop').addEventListener('click', () => {
+    playSoundEffect('buy');
+    socket.emit('buy_property', {}, (res) => {
+      if (res && !res.ok) showToast(res.error);
+    });
+  });
+
+  document.getElementById('btn-skip-buy').addEventListener('click', () => {
+    socket.emit('skip_buy');
+  });
+
+  document.getElementById('btn-end-turn').addEventListener('click', () => {
+    socket.emit('end_turn');
+  });
+
+  // Sonido
+  document.getElementById('btn-toggle-sound').addEventListener('click', (e) => {
+    soundEnabled = !soundEnabled;
+    e.currentTarget.textContent = soundEnabled ? '🔊' : '🔇';
+    showToast(soundEnabled ? 'Efectos de sonido activados' : 'Sonido silenciado');
+  });
+
+  // Chat
+  document.getElementById('chat-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('chat-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    socket.emit('send_chat', { message: msg });
+    input.value = '';
+  });
+
+  // Modal de Propiedad
+  document.getElementById('btn-close-prop-dialog').addEventListener('click', () => {
+    document.getElementById('property-dialog').close();
+  });
+
+  document.getElementById('btn-build-house').addEventListener('click', () => {
+    if (inspectedTileId === null) return;
+    socket.emit('build_house', { tileId: inspectedTileId }, (res) => {
+      if (res && !res.ok) showToast(res.error);
+      else {
+        playSoundEffect('buy');
+        openPropertyModal(inspectedTileId);
+      }
+    });
+  });
+
+  document.getElementById('btn-sell-house').addEventListener('click', () => {
+    if (inspectedTileId === null) return;
+    socket.emit('sell_house', { tileId: inspectedTileId }, (res) => {
+      if (res && !res.ok) showToast(res.error);
+      else openPropertyModal(inspectedTileId);
+    });
+  });
+
+  document.getElementById('btn-toggle-mortgage').addEventListener('click', () => {
+    if (inspectedTileId === null) return;
+    socket.emit('toggle_mortgage', { tileId: inspectedTileId }, (res) => {
+      if (res && !res.ok) showToast(res.error);
+      else openPropertyModal(inspectedTileId);
+    });
+  });
+
+  // Modal de Negociación / Trueque
+  document.getElementById('btn-open-trade').addEventListener('click', openTradeModal);
+  document.getElementById('btn-close-trade-dialog').addEventListener('click', () => {
+    document.getElementById('trade-dialog').close();
+  });
+
+  document.getElementById('trade-target-player').addEventListener('change', populateTradeTargetProperties);
+
+  document.getElementById('trade-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const targetPlayerId = document.getElementById('trade-target-player').value;
+    const offerTileId = document.getElementById('trade-offer-tile').value || null;
+    const requestTileId = document.getElementById('trade-request-tile').value || null;
+    const offerMoney = Number(document.getElementById('trade-offer-money').value) || 0;
+    const requestMoney = Number(document.getElementById('trade-request-money').value) || 0;
+
+    socket.emit(
+      'propose_trade',
+      { targetPlayerId, offerTileId, requestTileId, offerMoney, requestMoney },
+      (res) => {
+        if (res && !res.ok) showToast(res.error);
+        else {
+          showToast('Oferta enviada a la Bolsa de Comercio');
+          document.getElementById('trade-dialog').close();
+        }
+      }
+    );
+  });
+}
+
+function joinRoomByCode(roomCode) {
+  const playerName = document.getElementById('input-player-name').value.trim() || 'Inversionista';
+  localStorage.setItem('gso_playerName', playerName);
+
+  socket.emit(
+    'join_room',
+    { roomCode, playerName, avatarId: selectedAvatarId, playerId: myPlayerId },
+    (res) => {
+      if (res && res.ok) {
+        window.history.replaceState({}, '', `?sala=${res.roomCode}`);
+      } else {
+        showToast(res?.error || 'No se pudo entrar a la sala');
+      }
+    }
+  );
+}
+
+// Eventos de Socket.IO
+socket.on('public_rooms', (roomsList) => {
+  const container = document.getElementById('public-rooms-list');
+  if (!roomsList || !roomsList.length) {
+    container.innerHTML = `<div class="empty-state">No hay salas abiertas en este instante. ¡Crea una a la izquierda e invita a tus amigos o agrega Bots!</div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  roomsList.forEach((r) => {
+    const item = document.createElement('div');
+    item.className = 'room-item';
+    item.innerHTML = `
+      <div class="room-item-info">
+        <strong>${r.code}</strong> — Mesa de ${r.hostName}
+        <small>👥 ${r.playerCount}/${r.maxPlayers} jugadores • Capital: ${formatCLP(r.startingMoney)}</small>
+      </div>
+      <button class="btn btn-accent btn-sm">Unirse</button>
+    `;
+    item.querySelector('button').addEventListener('click', () => joinRoomByCode(r.code));
+    container.appendChild(item);
+  });
+});
+
+socket.on('room_state', (state) => {
+  currentRoomState = state;
+  if (state.status === 'lobby') {
+    switchScreen('screen-lobby');
+    renderLobby(state);
+  } else {
+    switchScreen('screen-game');
+    renderGame(state);
+  }
+});
+
+const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+
+socket.on('dice_rolled', ({ dice }) => {
+  playSoundEffect('dice');
+  const d1 = document.getElementById('die-1');
+  const d2 = document.getElementById('die-2');
+  d1.classList.add('rolling');
+  d2.classList.add('rolling');
+  setTimeout(() => {
+    d1.textContent = DICE_FACES[(dice[0] || 1) - 1];
+    d2.textContent = DICE_FACES[(dice[1] || 1) - 1];
+    d1.classList.remove('rolling');
+    d2.classList.remove('rolling');
+  }, 240);
+});
+
+socket.on('card_drawn', ({ playerName, deckTitle, card }) => {
+  const banner = document.getElementById('last-card-banner');
+  banner.classList.remove('hidden');
+  document.getElementById('card-banner-deck').textContent = `${deckTitle} • ${playerName}`;
+  document.getElementById('card-banner-title').textContent = card.title;
+  document.getElementById('card-banner-text').textContent = card.text;
+});
+
+function renderLobby(state) {
+  document.getElementById('lobby-room-code').textContent = state.code;
+  document.getElementById('lobby-player-count').textContent = state.players.length;
+
+  const isHost = state.hostId === myPlayerId;
+  document.getElementById('btn-add-bot').style.display = isHost && state.players.length < 8 ? 'inline-flex' : 'none';
+
+  const startBtn = document.getElementById('btn-start-game');
+  startBtn.disabled = !isHost || state.players.length < 2;
+  document.getElementById('lobby-status-hint').textContent = isHost
+    ? (state.players.length >= 2
+      ? `¡Listos para partir con ${state.players.length} jugadores!`
+      : 'Agrega un Bot o invita a un amigo para tener mínimo 2 jugadores.')
+    : 'Esperando que el anfitrión inicie la partida...';
+
+  const grid = document.getElementById('lobby-players-grid');
+  grid.innerHTML = '';
+
+  state.players.forEach((p) => {
+    const card = document.createElement('div');
+    card.className = 'lobby-player-card';
+    card.style.borderColor = p.avatar.color;
+    card.innerHTML = `
+      <span class="lp-icon">${p.avatar.icon}</span>
+      <div>
+        <div class="lp-name">${p.name} ${p.id === myPlayerId ? '(Tú)' : ''}</div>
+        <div class="lp-role">${p.id === state.hostId ? '👑 Anfitrión' : (p.isBot ? '🤖 Bot Automático' : '🟢 Conectado')}</div>
+      </div>
+    `;
+
+    if (isHost && p.id !== state.hostId) {
+      const kickBtn = document.createElement('button');
+      kickBtn.className = 'btn-kick';
+      kickBtn.textContent = '✕';
+      kickBtn.title = 'Quitar de la sala';
+      kickBtn.addEventListener('click', () => {
+        socket.emit('remove_player', { targetPlayerId: p.id });
+      });
+      card.appendChild(kickBtn);
+    }
+
+    grid.appendChild(card);
+  });
+}
+
+function renderGame(state) {
+  document.getElementById('game-room-code').textContent = state.code;
+  document.getElementById('center-pot-amount').textContent = formatCLP(state.pot);
+
+  // Actualizar dados
+  const d1 = document.getElementById('die-1');
+  const d2 = document.getElementById('die-2');
+  d1.textContent = DICE_FACES[(state.lastDice[0] || 1) - 1];
+  d2.textContent = DICE_FACES[(state.lastDice[1] || 1) - 1];
+
+  const currentPlayer = state.players[state.turnIndex];
+  const isMyTurn = currentPlayer && currentPlayer.id === myPlayerId;
+
+  // Banner de turno o ganador
+  const turnBanner = document.getElementById('turn-banner');
+  if (state.status === 'finished' && state.winner) {
+    turnBanner.innerHTML = `🏆 ¡${state.winner.avatar.icon} ${state.winner.name} GANA GRAN SANTIAGO!`;
+  } else if (currentPlayer) {
+    turnBanner.innerHTML = isMyTurn
+      ? `🟢 ¡ES TU TURNO, ${currentPlayer.avatar.icon} ${currentPlayer.name}!`
+      : `⏳ Turno de ${currentPlayer.avatar.icon} ${currentPlayer.name}`;
+  }
+
+  // Botones de acción en el centro
+  const rollBtn = document.getElementById('btn-roll-dice');
+  const bailBtn = document.getElementById('btn-pay-bail');
+  const buyBox = document.getElementById('buy-decision-box');
+  const endBtn = document.getElementById('btn-end-turn');
+
+  rollBtn.classList.add('hidden');
+  bailBtn.classList.add('hidden');
+  buyBox.classList.add('hidden');
+  endBtn.classList.add('hidden');
+
+  if (state.status === 'playing' && isMyTurn) {
+    if (state.turnPhase === 'ROLL') {
+      rollBtn.classList.remove('hidden');
+      if (currentPlayer.inJail && currentPlayer.money >= 50000) {
+        bailBtn.classList.remove('hidden');
+      }
+    } else if (state.turnPhase === 'BUY_DECISION' && state.pendingBuyTileId !== null) {
+      const tile = boardMeta.BOARD_TILES[state.pendingBuyTileId];
+      if (tile) {
+        buyBox.classList.remove('hidden');
+        document.getElementById('buy-prompt-text').innerHTML =
+          `¿Comprar <strong>${tile.name}</strong> por <span style="color:#4ade80">${formatCLP(tile.price)}</span>?`;
+      }
+    } else if (state.turnPhase === 'END_TURN') {
+      endBtn.classList.remove('hidden');
+      endBtn.textContent = state.doublesCount > 0 && !currentPlayer.inJail
+        ? '🎲 Tirar de Nuevo (Dobles)'
+        : '⏭️ Terminar Turno';
+    }
+  }
+
+  // Lista lateral de jugadores
+  const playersList = document.getElementById('players-list');
+  playersList.innerHTML = '';
+  state.players.forEach((p, idx) => {
+    const row = document.createElement('div');
+    row.className = 'player-row' +
+      (idx === state.turnIndex ? ' active-turn' : '') +
+      (p.bankrupt ? ' bankrupt' : '');
+    row.style.borderLeftColor = p.avatar.color;
+
+    const tileName = boardMeta.BOARD_TILES[p.position]?.shortName || boardMeta.BOARD_TILES[p.position]?.name || '';
+    row.innerHTML = `
+      <div class="p-info">
+        <span class="p-avatar">${p.avatar.icon}</span>
+        <div>
+          <div class="p-name">${p.name} ${p.id === myPlayerId ? '(Tú)' : ''}</div>
+          <span class="p-status-tag">${p.bankrupt ? '💥 En Bancarrota' : (p.inJail ? '🚓 En Comisaría' : `📍 ${tileName}`)}</span>
+        </div>
+      </div>
+      <div class="p-money">${formatCLP(p.money)}</div>
+    `;
+    playersList.appendChild(row);
+  });
+
+  // Actualizar fichas y estado de propiedades en el tablero
+  boardMeta.BOARD_TILES.forEach((tile) => {
+    const tokenContainer = document.getElementById(`tokens-tile-${tile.id}`);
+    if (tokenContainer) tokenContainer.innerHTML = '';
+
+    const prop = state.properties[tile.id];
+    const ownerDot = document.getElementById(`owner-dot-${tile.id}`);
+    const mortgagedTag = document.getElementById(`mortgaged-tag-${tile.id}`);
+    const barEl = document.getElementById(`bar-tile-${tile.id}`);
+
+    if (prop) {
+      if (prop.ownerId) {
+        const owner = state.players.find((pl) => pl.id === prop.ownerId);
+        if (owner && ownerDot) {
+          ownerDot.style.backgroundColor = owner.avatar.color;
+          ownerDot.classList.remove('hidden');
+        }
+      } else if (ownerDot) {
+        ownerDot.classList.add('hidden');
+      }
+
+      if (mortgagedTag) {
+        mortgagedTag.classList.toggle('hidden', !prop.mortgaged);
+      }
+
+      if (barEl && tile.type === 'property') {
+        if (prop.houses === 5) {
+          barEl.innerHTML = '🏙️';
+        } else if (prop.houses > 0) {
+          barEl.innerHTML = '🏠'.repeat(prop.houses);
+        } else {
+          barEl.innerHTML = '';
+        }
+      }
+    }
+  });
+
+  state.players.forEach((p) => {
+    if (p.bankrupt) return;
+    const tokenContainer = document.getElementById(`tokens-tile-${p.position}`);
+    if (tokenContainer) {
+      const tok = document.createElement('div');
+      tok.className = 'board-token';
+      tok.style.borderColor = p.avatar.color;
+      tok.title = `${p.name} (${formatCLP(p.money)})`;
+      tok.textContent = p.avatar.icon;
+      tokenContainer.appendChild(tok);
+    }
+  });
+
+  // Mis Propiedades
+  renderMyProperties(state);
+
+  // Ofertas de Trueque pendientes para mí
+  renderPendingTrades(state);
+
+  // Crónica Financiera y Chat
+  renderLogsAndChat(state);
+}
+
+function renderMyProperties(state) {
+  const myPropsContainer = document.getElementById('my-properties-list');
+  const myOwnedTiles = boardMeta.BOARD_TILES.filter(
+    (t) => state.properties[t.id]?.ownerId === myPlayerId
+  );
+
+  document.getElementById('my-props-count').textContent = myOwnedTiles.length;
+
+  if (!myOwnedTiles.length) {
+    myPropsContainer.innerHTML = `<p class="empty-small">Aún no tienes propiedades. ¡Lanza los dados y compra comunas!</p>`;
+    return;
+  }
+
+  myPropsContainer.innerHTML = '';
+  myOwnedTiles.forEach((tile) => {
+    const prop = state.properties[tile.id];
+    const groupColor = boardMeta.COLOR_GROUPS[tile.group]?.color || '#64748b';
+    const item = document.createElement('div');
+    item.className = 'my-prop-item';
+    item.style.borderLeftColor = groupColor;
+
+    let badge = '';
+    if (prop.mortgaged) badge = '🏦 Hipotecada';
+    else if (prop.houses === 5) badge = '🏙️ Torre';
+    else if (prop.houses > 0) badge = `🏠x${prop.houses}`;
+
+    item.innerHTML = `
+      <span><strong>${tile.name}</strong></span>
+      <span style="color:#93c5fd; font-size:0.75rem">${badge || formatCompactCLP(tile.price)}</span>
+    `;
+    item.addEventListener('click', () => openPropertyModal(tile.id));
+    myPropsContainer.appendChild(item);
+  });
+}
+
+function renderPendingTrades(state) {
+  const banner = document.getElementById('active-trades-banner');
+  const myTrades = (state.trades || []).filter((t) => t.toId === myPlayerId);
+  if (!myTrades.length) {
+    banner.classList.add('hidden');
+    return;
+  }
+
+  const tr = myTrades[0];
+  const offerTileName = tr.offerTileId ? boardMeta.BOARD_TILES[tr.offerTileId]?.name : null;
+  const reqTileName = tr.requestTileId ? boardMeta.BOARD_TILES[tr.requestTileId]?.name : null;
+
+  banner.classList.remove('hidden');
+  banner.innerHTML = `
+    <div><strong>🤝 Oferta de ${tr.fromName}:</strong></div>
+    <div style="margin: 4px 0;">
+      Ofrece: <strong>${offerTileName || 'Ninguna prop.'} + ${formatCLP(tr.offerMoney)}</strong><br/>
+      Pide: <strong>${reqTileName || 'Ninguna prop.'} + ${formatCLP(tr.requestMoney)}</strong>
+    </div>
+    <div style="display:flex; gap:6px; justify-content:center; margin-top:4px;">
+      <button id="btn-accept-trade" class="btn btn-success btn-xs">Aceptar Trato</button>
+      <button id="btn-reject-trade" class="btn btn-danger-outline btn-xs">Rechazar</button>
+    </div>
+  `;
+
+  document.getElementById('btn-accept-trade').onclick = () => {
+    socket.emit('respond_trade', { tradeId: tr.id, accept: true });
+  };
+  document.getElementById('btn-reject-trade').onclick = () => {
+    socket.emit('respond_trade', { tradeId: tr.id, accept: false });
+  };
+}
+
+function renderLogsAndChat(state) {
+  const logsEl = document.getElementById('game-logs');
+  logsEl.innerHTML = '';
+  state.logs.forEach((l) => {
+    const div = document.createElement('div');
+    div.className = `log-entry ${l.type || 'info'}`;
+    div.innerHTML = `<span class="log-time">[${l.time}]</span> ${l.text}`;
+    logsEl.appendChild(div);
+  });
+
+  const chatEl = document.getElementById('chat-messages');
+  chatEl.innerHTML = '';
+  state.chat.forEach((c) => {
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    div.innerHTML = `<strong>${c.avatar?.icon || ''} ${c.playerName}:</strong> ${c.text}`;
+    chatEl.appendChild(div);
+  });
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function openPropertyModal(tileId) {
+  const tile = boardMeta.BOARD_TILES[tileId];
+  if (!tile) return;
+  inspectedTileId = tileId;
+
+  const dialog = document.getElementById('property-dialog');
+  const header = document.getElementById('prop-dialog-header');
+  const comunaEl = document.getElementById('prop-dialog-comuna');
+  const titleEl = document.getElementById('prop-dialog-title');
+  const priceEl = document.getElementById('prop-dialog-price');
+  const ownerEl = document.getElementById('prop-dialog-owner');
+  const rentTable = document.querySelector('#prop-rent-table tbody');
+  const descEl = document.getElementById('prop-dialog-desc');
+  const actionsBox = document.getElementById('prop-owner-actions');
+
+  const groupInfo = tile.group ? boardMeta.COLOR_GROUPS[tile.group] : null;
+  header.style.background = groupInfo ? groupInfo.color : '#334155';
+  comunaEl.textContent = tile.comuna || groupInfo?.name || 'CASILLA ESPECIAL';
+  titleEl.textContent = tile.name;
+
+  priceEl.textContent = tile.price ? formatCLP(tile.price) : '—';
+  rentTable.innerHTML = '';
+  descEl.textContent = tile.description || '';
+
+  const propState = currentRoomState?.properties?.[tileId];
+  if (propState) {
+    const owner = currentRoomState.players.find((p) => p.id === propState.ownerId);
+    ownerEl.textContent = owner
+      ? `Dueño: ${owner.avatar.icon} ${owner.name} ${propState.mortgaged ? '(HIPOTECADA)' : ''}`
+      : '🟢 Disponible en Conservador de Bienes Raíces';
+  } else {
+    ownerEl.textContent = 'Casilla Pública de Santiago';
+  }
+
+  if (tile.type === 'property') {
+    const labels = [
+      'Arriendo Sitio Sin Edificar',
+      'Con 1 Casa 🏠',
+      'Con 2 Casas 🏠🏠',
+      'Con 3 Casas 🏠🏠🏠',
+      'Con 4 Casas 🏠🏠🏠🏠',
+      'Con Torre Costanera (Hotel) 🏙️'
+    ];
+    tile.rents.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      if (propState && propState.houses === i && propState.ownerId) {
+        tr.style.background = 'rgba(56, 189, 248, 0.18)';
+      }
+      tr.innerHTML = `<td>${labels[i]}</td><td>${formatCLP(r)}</td>`;
+      rentTable.appendChild(tr);
+    });
+    const buildTr = document.createElement('tr');
+    buildTr.innerHTML = `<td><strong>Costo Edificación Casa/Torre</strong></td><td>${formatCLP(tile.houseCost)}</td>`;
+    rentTable.appendChild(buildTr);
+  } else if (tile.type === 'station') {
+    tile.rents.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>Con ${i + 1} Estación(es) de Metro</td><td>${formatCLP(r)}</td>`;
+      rentTable.appendChild(tr);
+    });
+  }
+
+  // Mostrar controles si el jugador es el propietario
+  if (propState && propState.ownerId === myPlayerId && currentRoomState?.status === 'playing') {
+    actionsBox.classList.remove('hidden');
+    document.getElementById('btn-build-house').style.display = tile.type === 'property' ? 'inline-flex' : 'none';
+    document.getElementById('btn-sell-house').style.display =
+      tile.type === 'property' && propState.houses > 0 ? 'inline-flex' : 'none';
+    document.getElementById('btn-toggle-mortgage').textContent = propState.mortgaged
+      ? `🏦 Levantar Hipoteca (${formatCLP(Math.floor(tile.price * 0.55))})`
+      : `🏦 Hipotecar (+${formatCLP(Math.floor(tile.price / 2))})`;
+  } else {
+    actionsBox.classList.add('hidden');
+  }
+
+  if (!dialog.open) dialog.showModal();
+}
+
+function openTradeModal() {
+  if (!currentRoomState || currentRoomState.status !== 'playing') return;
+  const dialog = document.getElementById('trade-dialog');
+  const targetSelect = document.getElementById('trade-target-player');
+  const offerSelect = document.getElementById('trade-offer-tile');
+
+  const otherPlayers = currentRoomState.players.filter((p) => p.id !== myPlayerId && !p.bankrupt);
+  if (!otherPlayers.length) {
+    showToast('No hay otros jugadores disponibles para negociar.');
+    return;
+  }
+
+  targetSelect.innerHTML = '';
+  otherPlayers.forEach((p) => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.avatar.icon} ${p.name} (${formatCLP(p.money)})`;
+    targetSelect.appendChild(opt);
+  });
+
+  // Mis propiedades para ofrecer
+  offerSelect.innerHTML = '<option value="">— Ninguna propiedad —</option>';
+  boardMeta.BOARD_TILES.forEach((t) => {
+    if (currentRoomState.properties[t.id]?.ownerId === myPlayerId && !currentRoomState.properties[t.id]?. houses) {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${t.name} (${formatCLP(t.price)})`;
+      offerSelect.appendChild(opt);
+    }
+  });
+
+  populateTradeTargetProperties();
+  if (!dialog.open) dialog.showModal();
+}
+
+function populateTradeTargetProperties() {
+  const targetId = document.getElementById('trade-target-player').value;
+  const reqSelect = document.getElementById('trade-request-tile');
+  reqSelect.innerHTML = '<option value="">— Ninguna propiedad —</option>';
+  if (!targetId || !currentRoomState) return;
+
+  boardMeta.BOARD_TILES.forEach((t) => {
+    if (currentRoomState.properties[t.id]?.ownerId === targetId && !currentRoomState.properties[t.id]?.houses) {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${t.name} (${formatCLP(t.price)})`;
+      reqSelect.appendChild(opt);
+    }
+  });
+}
+
+window.addEventListener('DOMContentLoaded', initApp);

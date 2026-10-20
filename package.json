@@ -1,0 +1,22 @@
+{
+  "name": "gran-santiago-online",
+  "version": "1.0.0",
+  "description": "Gran Santiago Online - Juego de mesa multijugador en tiempo real (2 a 8 jugadores) con economia en Pesos Chilenos (CLP)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test_game.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.4"
+  }
+}

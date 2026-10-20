@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gran Santiago Online 🚇🇨🇱 | Juego de Mesa Multijugador (2 a 8 Jugadores)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <!-- Notificaciones flotantes (Toasts) -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- ================= PANTALLA DE BIENVENIDA / SALAS ONLINE ================= -->
+  <main id="screen-auth" class="screen active">
+    <div class="hero-backdrop"></div>
+    <div class="auth-container">
+      <header class="brand-header">
+        <div class="brand-badge">🇨🇱 EDICIÓN METROPOLITANA ONLINE • 2 A 8 JUGADORES</div>
+        <h1 class="brand-title">GRAN SANTIAGO <span>ONLINE</span></h1>
+        <p class="brand-subtitle">Compra comunas emblemáticas, estaciones del Metro, edifica torres en Sanhattan y domina la economía en Pesos Chilenos ($ CLP).</p>
+      </header>
+
+      <div class="auth-grid">
+        <!-- Tarjeta de Perfil y Acciones -->
+        <section class="glass-card auth-card">
+          <h2>👤 Tu Perfil de Inversionista</h2>
+          <div class="form-group">
+            <label for="input-player-name">Tu Apodo / Nombre</label>
+            <input type="text" id="input-player-name" maxlength="18" placeholder="Ej: Don Farkas, La Jefa, Seba..." autocomplete="off" />
+          </div>
+
+          <div class="form-group">
+            <label>Elige tu Ficha Chilena</label>
+            <div id="avatar-selector" class="avatar-grid"></div>
+          </div>
+
+          <div class="divider"><span>CREAR NUEVA PARTIDA</span></div>
+
+          <div class="form-group">
+            <label for="select-starting-money">Capital Inicial BancoEstado ($ CLP)</label>
+            <select id="select-starting-money">
+              <option value="1500000" selected>$1.500.000 CLP (Estándar Oficial)</option>
+              <option value="2000000">$2.000.000 CLP (Capital Abundante)</option>
+              <option value="1000000">$1.000.000 CLP (Modo Crisis / Rápido)</option>
+            </select>
+          </div>
+
+          <button id="btn-create-room" class="btn btn-primary btn-lg btn-block">
+            🚇 Crear Sala Online (2 - 8 Jugadores)
+          </button>
+
+          <div class="divider"><span>O ÚNETE CON CÓDIGO</span></div>
+
+          <div class="join-code-row">
+            <input type="text" id="input-room-code" placeholder="STGO-XXXX" maxlength="10" />
+            <button id="btn-join-code" class="btn btn-secondary">Entrar a Sala</button>
+          </div>
+        </section>
+
+        <!-- Salas Públicas en Vivo y Guía Rápida -->
+        <section class="glass-card public-rooms-card">
+          <div class="card-header-flex">
+            <h2>🌐 Salas Públicas en Espera</h2>
+            <button id="btn-refresh-rooms" class="btn btn-ghost btn-sm" title="Actualizar lista">🔄 Actualizar</button>
+          </div>
+          <div id="public-rooms-list" class="public-rooms-list">
+            <div class="empty-state">No hay salas abiertas en este instante. ¡Crea una a la izquierda e invita a tus amigos o agrega Bots!</div>
+          </div>
+
+          <div class="features-box">
+            <h3>✨ Reglas Oficiales Gran Santiago</h3>
+            <ul>
+              <li>💰 <strong>Economía en CLP:</strong> Sueldo de <strong>$200.000</strong> cada vez que pasas por Plaza Baquedano.</li>
+              <li>🏗️ <strong>Monopolio y Edificación:</strong> Al reunir todas las calles de un sector (color), cobras doble arriendo y puedes construir hasta 4 Casas y 1 Torre Costanera.</li>
+              <li>🎡 <strong>Pozo Parque O'Higgins:</strong> Todo lo recaudado por el SII y Pórticos TAG se acumula en la Fonda Libre del Parque O'Higgins.</li>
+              <li>🤝 <strong>Bolsa de Comercio:</strong> Negocia propiedades y efectivo en tiempo real con cualquier jugador.</li>
+            </ul>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================= PANTALLA DE SALA DE ESPERA (LOBBY) ================= -->
+  <section id="screen-lobby" class="screen">
+    <div class="lobby-container glass-card">
+      <div class="lobby-top">
+        <div>
+          <span class="badge-online">🟢 SALA ONLINE ACTIVA</span>
+          <h2>Sala de Espera — <span id="lobby-room-code" class="highlight-code">STGO-0000</span></h2>
+          <p class="text-muted">Comparte el código o el enlace directo con tus amigos (mínimo 2, máximo 8 jugadores).</p>
+        </div>
+        <div class="lobby-share-actions">
+          <button id="btn-copy-link" class="btn btn-secondary">🔗 Copiar Enlace de Invitación</button>
+          <button id="btn-leave-lobby" class="btn btn-danger-outline">Salir</button>
+        </div>
+      </div>
+
+      <div class="lobby-players-header">
+        <h3>Jugadores Conectados (<span id="lobby-player-count">1</span>/8)</h3>
+        <button id="btn-add-bot" class="btn btn-accent btn-sm">🤖 + Agregar Bot Chileno</button>
+      </div>
+
+      <div id="lobby-players-grid" class="lobby-players-grid"></div>
+
+      <div class="lobby-footer">
+        <p id="lobby-status-hint" class="lobby-hint">Esperando al menos 2 jugadores para abrir las boleterías del Metro...</p>
+        <button id="btn-start-game" class="btn btn-primary btn-lg" disabled>
+          🚀 ¡Iniciar Partida en Gran Santiago!
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PANTALLA DE JUEGO PRINCIPAL ================= -->
+  <section id="screen-game" class="screen">
+    <div class="game-layout">
+      <!-- COLUMNA IZQUIERDA: Jugadores, Billeteras CLP y Propiedades -->
+      <aside class="sidebar sidebar-left">
+        <div class="sidebar-header">
+          <div class="room-pill">
+            <span>SALA: <strong id="game-room-code">STGO-0000</strong></span>
+            <button id="btn-copy-game-link" class="btn-icon" title="Copiar invitación">🔗</button>
+          </div>
+          <button id="btn-toggle-sound" class="btn-icon" title="Activar/Silenciar Efectos de Sonido">🔊</button>
+        </div>
+
+        <div class="panel-box">
+          <h3 class="panel-title">👥 Magnates en Competencia</h3>
+          <div id="players-list" class="players-list"></div>
+        </div>
+
+        <div class="panel-box my-portfolio-box">
+          <div class="panel-header-row">
+            <h3 class="panel-title">🏢 Mis Escrituras (<span id="my-props-count">0</span>)</h3>
+            <button id="btn-open-trade" class="btn btn-accent btn-xs">🤝 Negociar</button>
+          </div>
+          <div id="my-properties-list" class="my-properties-list">
+            <p class="empty-small">Aún no tienes propiedades. ¡Lanza los dados y compra comunas!</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CENTRO: TABLERO 11x11 DEL GRAN SANTIAGO -->
+      <section class="board-wrapper">
+        <div id="board-grid" class="board-grid">
+          <!-- El centro del tablero (filas 2..10, columnas 2..10) -->
+          <div class="board-center">
+            <div class="center-header">
+              <div class="center-logo">🚇 GRAN SANTIAGO</div>
+              <div class="pot-banner" title="Pozo acumulado por Impuestos SII y TAG. ¡Cae en Parque O'Higgins para ganarlo!">
+                <span>🎡 Pozo Parque O'Higgins:</span>
+                <strong id="center-pot-amount">$100.000</strong>
+              </div>
+            </div>
+
+            <!-- Indicador de Turno y Dados -->
+            <div class="turn-stage">
+              <div id="turn-banner" class="turn-banner">Turno de...</div>
+
+              <div class="dice-container">
+                <div id="die-1" class="die" data-val="1">⚀</div>
+                <div id="die-2" class="die" data-val="1">⚀</div>
+              </div>
+
+              <!-- Controles de Acción del Jugador en Turno -->
+              <div id="action-controls" class="action-controls">
+                <button id="btn-roll-dice" class="btn btn-primary btn-lg pulse-btn">
+                  🎲 Lanzar Dados
+                </button>
+                <button id="btn-pay-bail" class="btn btn-warning hidden">
+                  🚓 Pagar Fianza ($50.000)
+                </button>
+                <div id="buy-decision-box" class="buy-decision-box hidden">
+                  <div id="buy-prompt-text" class="buy-prompt-text">¿Comprar propiedad?</div>
+                  <div class="buy-buttons">
+                    <button id="btn-buy-prop" class="btn btn-success">✅ Comprar Escritura</button>
+                    <button id="btn-skip-buy" class="btn btn-secondary">Pasar</button>
+                  </div>
+                </div>
+                <button id="btn-end-turn" class="btn btn-accent btn-lg hidden">
+                  ⏭️ Terminar Turno
+                </button>
+              </div>
+            </div>
+
+            <!-- Ofertas Comerciales Pendientes -->
+            <div id="active-trades-banner" class="active-trades-banner hidden"></div>
+
+            <!-- Última Tarjeta Sacada -->
+            <div id="last-card-banner" class="last-card-banner hidden">
+              <div class="card-badge" id="card-banner-deck">¡ALÓ SANTIAGO!</div>
+              <strong id="card-banner-title">Título</strong>
+              <p id="card-banner-text">Descripción de la tarjeta...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- COLUMNA DERECHA: Crónica de Santiago y Chat en Vivo -->
+      <aside class="sidebar sidebar-right">
+        <div class="panel-box log-panel">
+          <h3 class="panel-title">📰 Diario Financiero de Santiago</h3>
+          <div id="game-logs" class="game-logs"></div>
+        </div>
+
+        <div class="panel-box chat-panel">
+          <h3 class="panel-title">💬 Chat de la Mesa</h3>
+          <div id="chat-messages" class="chat-messages"></div>
+          <form id="chat-form" class="chat-form">
+            <input type="text" id="chat-input" placeholder="Escribe un mensaje a la mesa..." maxlength="160" autocomplete="off" />
+            <button type="submit" class="btn btn-primary btn-sm">Enviar</button>
+          </form>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ================= MODAL NATIVO: INSPECCIÓN DE PROPIEDAD Y EDIFICACIÓN ================= -->
+  <dialog id="property-dialog" closedby="any" aria-labelledby="prop-dialog-title" class="modern-dialog">
+    <div class="dialog-card">
+      <div id="prop-dialog-header" class="prop-dialog-header">
+        <span id="prop-dialog-comuna" class="prop-comuna">COMUNA</span>
+        <h3 id="prop-dialog-title">Nombre de la Propiedad</h3>
+      </div>
+      <div class="prop-dialog-body">
+        <div class="prop-price-tag">
+          <span>Valor Comercial:</span>
+          <strong id="prop-dialog-price">$0</strong>
+        </div>
+        <div id="prop-dialog-owner" class="prop-owner-badge">Sin dueño (Disponible)</div>
+
+        <table id="prop-rent-table" class="rent-table">
+          <tbody></tbody>
+        </table>
+
+        <p id="prop-dialog-desc" class="prop-desc"></p>
+
+        <!-- Botones de gestión si el jugador es el dueño -->
+        <div id="prop-owner-actions" class="prop-owner-actions hidden">
+          <button id="btn-build-house" class="btn btn-success btn-sm">🏗️ Construir Casa / Torre</button>
+          <button id="btn-sell-house" class="btn btn-warning btn-sm">🔨 Vender Edificación</button>
+          <button id="btn-toggle-mortgage" class="btn btn-secondary btn-sm">🏦 Hipotecar en BancoEstado</button>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" id="btn-close-prop-dialog" class="btn btn-ghost">Cerrar (Esc)</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ================= MODAL NATIVO: NEGOCIACIÓN / TRUEQUE ENTRE JUGADORES ================= -->
+  <dialog id="trade-dialog" closedby="any" aria-labelledby="trade-dialog-title" class="modern-dialog">
+    <div class="dialog-card">
+      <div class="prop-dialog-header" style="background: linear-gradient(135deg, #2563eb, #1d4ed8);">
+        <span class="prop-comuna">BOLSA DE COMERCIO DE SANTIAGO</span>
+        <h3 id="trade-dialog-title">🤝 Proponer Negocio Inmobiliario</h3>
+      </div>
+      <form id="trade-form" class="prop-dialog-body">
+        <div class="form-group">
+          <label for="trade-target-player">Negociar con el jugador:</label>
+          <select id="trade-target-player" required></select>
+        </div>
+
+        <div class="trade-columns">
+          <div class="trade-col">
+            <h4>📤 Tú Ofreces</h4>
+            <label for="trade-offer-tile">Propiedad:</label>
+            <select id="trade-offer-tile">
+              <option value="">— Ninguna propiedad —</option>
+            </select>
+            <label for="trade-offer-money">Efectivo ($ CLP):</label>
+            <input type="number" id="trade-offer-money" min="0" step="10000" value="0" />
+          </div>
+
+          <div class="trade-col">
+            <h4>📥 Tú Pides a Cambio</h4>
+            <label for="trade-request-tile">Propiedad:</label>
+            <select id="trade-request-tile">
+              <option value="">— Ninguna propiedad —</option>
+            </select>
+            <label for="trade-request-money">Efectivo ($ CLP):</label>
+            <input type="number" id="trade-request-money" min="0" step="10000" value="0" />
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <button type="button" id="btn-close-trade-dialog" class="btn btn-ghost">Cancelar</button>
+          <button type="submit" class="btn btn-primary">📨 Enviar Oferta</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+</body>
+</html>
