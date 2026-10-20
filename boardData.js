@@ -673,10 +673,121 @@ const COMMUNITY_CARDS = [
   }
 ];
 
+// 57 Símbolos para "¿Cuál es?" (Plano Proyectivo Finito de orden 7: 8 símbolos por carta, exactamente 1 coincidencia entre cualquier par)
+const CUAL_ES_SYMBOLS = [
+  { id: 0,  icon: '🦅', name: 'Cóndor' },
+  { id: 1,  icon: '🥟', name: 'Empanada' },
+  { id: 2,  icon: '🚇', name: 'Metro' },
+  { id: 3,  icon: '🗿', name: 'Moai' },
+  { id: 4,  icon: '🎸', name: 'Guitarra' },
+  { id: 5,  icon: '🌋', name: 'Volcán' },
+  { id: 6,  icon: '🍷', name: 'Copa de Vino' },
+  { id: 7,  icon: '🥑', name: 'Palta' },
+  { id: 8,  icon: '🌭', name: 'Completo' },
+  { id: 9,  icon: '🐕', name: 'Quiltro' },
+  { id: 10, icon: '⚽', name: 'Pelota' },
+  { id: 11, icon: '🏆', name: 'Copa' },
+  { id: 12, icon: '☀️', name: 'Sol' },
+  { id: 13, icon: '🌙', name: 'Luna' },
+  { id: 14, icon: '⭐', name: 'Estrella' },
+  { id: 15, icon: '⚡', name: 'Rayo' },
+  { id: 16, icon: '🔥', name: 'Fuego' },
+  { id: 17, icon: '💧', name: 'Gota' },
+  { id: 18, icon: '❄️', name: 'Copo de Nieve' },
+  { id: 19, icon: '🌈', name: 'Arcoíris' },
+  { id: 20, icon: '🍎', name: 'Manzana' },
+  { id: 21, icon: '🍓', name: 'Frutilla' },
+  { id: 22, icon: '🍒', name: 'Guinda' },
+  { id: 23, icon: '🍕', name: 'Pizza' },
+  { id: 24, icon: '🍔', name: 'Hamburguesa' },
+  { id: 25, icon: '🍟', name: 'Papas Fritas' },
+  { id: 26, icon: '🍦', name: 'Helado' },
+  { id: 27, icon: '🍩', name: 'Dona' },
+  { id: 28, icon: '🎂', name: 'Torta' },
+  { id: 29, icon: '🍿', name: 'Cabritas' },
+  { id: 30, icon: '🐱', name: 'Gato' },
+  { id: 31, icon: '🦊', name: 'Zorro Culpeo' },
+  { id: 32, icon: '🐼', name: 'Panda' },
+  { id: 33, icon: '🐸', name: 'Rana' },
+  { id: 34, icon: '🐧', name: 'Pingüino' },
+  { id: 35, icon: '🐢', name: 'Tortuga' },
+  { id: 36, icon: '🐙', name: 'Pulpo' },
+  { id: 37, icon: '🦋', name: 'Mariposa' },
+  { id: 38, icon: '🐝', name: 'Abeja' },
+  { id: 39, icon: '🌵', name: 'Cactus' },
+  { id: 40, icon: '🌺', name: 'Copihue' },
+  { id: 41, icon: '🍀', name: 'Trébol' },
+  { id: 42, icon: '🍄', name: 'Hongo' },
+  { id: 43, icon: '🚗', name: 'Auto' },
+  { id: 44, icon: '✈️', name: 'Avión' },
+  { id: 45, icon: '🚀', name: 'Cohete' },
+  { id: 46, icon: '⛵', name: 'Velero' },
+  { id: 47, icon: '🚲', name: 'Bicicleta' },
+  { id: 48, icon: '🎈', name: 'Globo' },
+  { id: 49, icon: '🎁', name: 'Regalo' },
+  { id: 50, icon: '👑', name: 'Corona' },
+  { id: 51, icon: '💎', name: 'Diamante' },
+  { id: 52, icon: '🔑', name: 'Llave' },
+  { id: 53, icon: '🔒', name: 'Candado' },
+  { id: 54, icon: '🔔', name: 'Campana' },
+  { id: 55, icon: '⏰', name: 'Reloj' },
+  { id: 56, icon: '💡', name: 'Ampolleta' }
+];
+
+function generateCualEsDeck() {
+  const n = 7;
+  const cards = [];
+
+  // Primera carta: 8 símbolos (0..7)
+  const firstCard = [];
+  for (let i = 0; i <= n; i++) firstCard.push(i);
+  cards.push(firstCard);
+
+  // n cartas siguientes
+  for (let j = 0; j < n; j++) {
+    const card = [0];
+    for (let k = 0; k < n; k++) {
+      card.push(n + 1 + j * n + k);
+    }
+    cards.push(card);
+  }
+
+  // n * n cartas restantes
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const card = [i + 1];
+      for (let k = 0; k < n; k++) {
+        const val = n + 1 + k * n + ((j + i * k) % n);
+        card.push(val);
+      }
+      cards.push(card);
+    }
+  }
+
+  // Barajar el orden de los símbolos dentro de cada carta y luego barajar el mazo
+  const shuffledCards = cards.map((cardSymbols) => {
+    const copy = [...cardSymbols];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const r = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[r]] = [copy[r], copy[i]];
+    }
+    return copy;
+  });
+
+  for (let i = shuffledCards.length - 1; i > 0; i--) {
+    const r = Math.floor(Math.random() * (i + 1));
+    [shuffledCards[i], shuffledCards[r]] = [shuffledCards[r], shuffledCards[i]];
+  }
+
+  return shuffledCards;
+}
+
 module.exports = {
   COLOR_GROUPS,
   PLAYER_AVATARS,
   BOARD_TILES,
   CHANCE_CARDS,
-  COMMUNITY_CARDS
+  COMMUNITY_CARDS,
+  CUAL_ES_SYMBOLS,
+  generateCualEsDeck
 };

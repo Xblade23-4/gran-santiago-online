@@ -8,7 +8,9 @@ const {
   PLAYER_AVATARS,
   BOARD_TILES,
   CHANCE_CARDS,
-  COMMUNITY_CARDS
+  COMMUNITY_CARDS,
+  CUAL_ES_SYMBOLS,
+  generateCualEsDeck
 } = require('./boardData');
 
 const app = express();
@@ -55,10 +57,12 @@ function createRoom(hostPlayer, customCode, settings = {}) {
   const code = customCode || generateRoomCode();
   const initialMoney = Number(settings.startingMoney) || 1500000;
   const passGoMoney = Number(settings.passGoMoney) || 200000;
+  const gameType = settings.gameType === 'cual_es' ? 'cual_es' : 'santiago';
 
   const room = {
     code,
     hostId: hostPlayer.id,
+    gameType, // 'santiago' | 'cual_es'
     status: 'lobby', // 'lobby' | 'playing' | 'finished'
     settings: {
       startingMoney: initialMoney,
@@ -74,11 +78,19 @@ function createRoom(hostPlayer, customCode, settings = {}) {
     pot: 100000, // Pozo inicial Parque O'Higgins
     properties: createInitialProperties(),
     trades: [], // Ofertas de trueque activas
+    cualEs: {
+      centerCard: [],
+      remainingDeckCount: 0,
+      playerCards: {},
+      scores: {},
+      penalties: {},
+      lastMatch: null
+    },
     logs: [
       {
         id: Date.now() + '-' + Math.random(),
         time: new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
-        text: `¡Sala ${code} creada en Gran Santiago! Esperando jugadores (2 a 8)...`,
+        text: `¡Sala ${code} creada (${gameType === 'cual_es' ? '¿Cuál es?' : 'Gran Santiago'})! Esperando jugadores (2 a 8)...`,
         type: 'system'
       }
     ],
@@ -614,11 +626,14 @@ function serializeRoom(room) {
   return {
     code: room.code,
     hostId: room.hostId,
+    gameType: room.gameType || 'santiago',
     status: room.status,
     settings: room.settings,
     players: room.players.map((p) => ({
       ...p,
-      netWorth: calculateNetWorth(room, p)
+      netWorth: calculateNetWorth(room, p),
+      cualEsScore: room.cualEs?.scores?.[p.id] || 0,
+      penaltyUntil: room.cualEs?.penalties?.[p.id] || 0
     })),
     turnIndex: room.turnIndex,
     turnPhase: room.turnPhase,
@@ -628,6 +643,16 @@ function serializeRoom(room) {
     pot: room.pot,
     properties: room.properties,
     trades: room.trades,
+    cualEs: room.cualEs
+      ? {
+          centerCard: room.cualEs.centerCard,
+          remainingDeckCount: room.cualEs.remainingDeckCount,
+          playerCards: room.cualEs.playerCards,
+          scores: room.cualEs.scores,
+          penalties: room.cualEs.penalties,
+          lastMatch: room.cualEs.lastMatch
+        }
+      : null,
     logs: room.logs,
     chat: room.chat,
     winner: room.winner
@@ -645,6 +670,7 @@ function broadcastPublicRooms() {
       const host = room.players.find((p) => p.id === room.hostId) || room.players[0];
       publicList.push({
         code: room.code,
+        gameType: room.gameType || 'santiago',
         hostName: host ? host.name : 'Anfitrión',
         playerCount: room.players.length,
         maxPlayers: room.settings.maxPlayers,
@@ -655,12 +681,13 @@ function broadcastPublicRooms() {
   io.emit('public_rooms', publicList);
 }
 
-// Endpoint de datos estáticos del tablero
+// Endpoint de datos estáticos del tablero y símbolos de ¿Cuál es?
 app.get('/api/board', (req, res) => {
   res.json({
     COLOR_GROUPS,
     PLAYER_AVATARS,
-    BOARD_TILES
+    BOARD_TILES,
+    CUAL_ES_SYMBOLS
   });
 });
 
@@ -676,7 +703,7 @@ io.on('connection', (socket) => {
   });
 
   // Crear sala nueva
-  socket.on('create_room', ({ playerName, avatarId, startingMoney, playerId }, callback) => {
+  socket.on('create_room', ({ playerName, avatarId, startingMoney, gameType, playerId }, callback) => {
     const cleanName = (playerName || 'Santiaguino').trim().slice(0, 20) || 'Santiaguino';
     const pid = playerId || 'p_' + Math.random().toString(36).substring(2, 10);
     const chosenAvatar = PLAYER_AVATARS.find((a) => a.id === avatarId) || PLAYER_AVATARS[0];
@@ -696,7 +723,7 @@ io.on('connection', (socket) => {
       isBot: false
     };
 
-    const room = createRoom(hostPlayer, null, { startingMoney: initCash });
+    const room = createRoom(hostPlayer, null, { startingMoney: initCash, gameType });
     currentRoomCode = room.code;
     currentPlayerId = pid;
     socket.join(room.code);
@@ -704,6 +731,20 @@ io.on('connection', (socket) => {
     broadcastRoomState(room);
     broadcastPublicRooms();
     if (callback) callback({ ok: true, roomCode: room.code, playerId: pid, state: serializeRoom(room) });
+  });
+
+  // Cambiar modo de juego en el Lobby (Gran Santiago vs ¿Cuál es?)
+  socket.on('set_game_type', ({ gameType }) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || room.status !== 'lobby' || room.hostId !== currentPlayerId) return;
+    room.gameType = gameType === 'cual_es' ? 'cual_es' : 'santiago';
+    addLog(
+      room,
+      `🎮 El anfitrión cambió el juego a: ${room.gameType === 'cual_es' ? '🔍 ¿Cuál es? (Agilidad Visual)' : '🚇 Gran Santiago Online'}.`,
+      'system'
+    );
+    broadcastRoomState(room);
+    broadcastPublicRooms();
   });
 
   // Unirse a sala existente (o reconectar)
@@ -842,6 +883,16 @@ io.on('connection', (socket) => {
     }
 
     room.status = 'playing';
+    room.winner = null;
+
+    if (room.gameType === 'cual_es') {
+      startCualEsGame(room);
+      broadcastRoomState(room);
+      broadcastPublicRooms();
+      if (callback) callback({ ok: true });
+      return;
+    }
+
     room.turnIndex = 0;
     room.turnPhase = 'ROLL';
     room.pendingBuyTileId = null;
@@ -861,6 +912,41 @@ io.on('connection', (socket) => {
       scheduleBotTurn(room);
     }
     if (callback) callback({ ok: true });
+  });
+
+  // Clic en un símbolo del juego "¿Cuál es?"
+  socket.on('cual_es_click', ({ symbolId }, callback) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || room.status !== 'playing' || room.gameType !== 'cual_es') return;
+    const player = room.players.find((p) => p.id === currentPlayerId);
+    if (!player) return;
+
+    const res = handleCualEsClick(room, player, Number(symbolId));
+    if (callback) callback(res);
+  });
+
+  // Volver al Lobby al terminar una partida
+  socket.on('return_to_lobby', () => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || room.hostId !== currentPlayerId) return;
+    if (room.cualEsBotTimer) {
+      clearInterval(room.cualEsBotTimer);
+      room.cualEsBotTimer = null;
+    }
+    room.status = 'lobby';
+    room.winner = null;
+    room.properties = createInitialProperties();
+    room.trades = [];
+    room.players.forEach((p) => {
+      p.money = room.settings.startingMoney;
+      p.position = 0;
+      p.inJail = false;
+      p.jailTurns = 0;
+      p.bankrupt = false;
+    });
+    addLog(room, '🔄 El anfitrión regresó la sala al Lobby para una nueva partida.', 'system');
+    broadcastRoomState(room);
+    broadcastPublicRooms();
   });
 
   // Lanzar Dados
@@ -1199,6 +1285,187 @@ function executeTrade(room, tradeId, accept) {
 
   addLog(room, `🤝 ¡Trato cerrado entre ${fromPlayer.name} y ${toPlayer.name}!`, 'success');
   return { ok: true };
+}
+
+// ============================================================================
+// MOTOR DEL JUEGO "¿CUÁL ES?" (AGILIDAD VISUAL Y COINCIDENCIAS)
+// ============================================================================
+function startCualEsGame(room) {
+  if (room.cualEsBotTimer) {
+    clearInterval(room.cualEsBotTimer);
+    room.cualEsBotTimer = null;
+  }
+
+  const deck = generateCualEsDeck();
+  const playerCards = {};
+  const scores = {};
+  const penalties = {};
+
+  room.players.forEach((p) => {
+    playerCards[p.id] = deck.pop();
+    scores[p.id] = 1; // 1 carta inicial ganada
+    penalties[p.id] = 0;
+  });
+
+  const centerCard = deck.pop();
+
+  room.cualEs = {
+    deck, // interno en el servidor
+    centerCard,
+    remainingDeckCount: deck.length,
+    playerCards,
+    scores,
+    penalties,
+    lastMatch: null
+  };
+
+  addLog(
+    room,
+    `🔍 ¡Comenzó "¿Cuál es?" con ${room.players.length} jugadores! Encuentra el dibujo repetido entre TU CARTA y la CARTA CENTRAL. ¡Cuidado: equivocarse da 3 segundos de bloqueo!`,
+    'success'
+  );
+
+  // Si hay bots en la partida, simular su agilidad visual
+  const hasBots = room.players.some((p) => p.isBot);
+  if (hasBots) {
+    room.cualEsBotTimer = setInterval(() => {
+      if (!rooms.has(room.code) || room.status !== 'playing' || room.gameType !== 'cual_es') {
+        clearInterval(room.cualEsBotTimer);
+        room.cualEsBotTimer = null;
+        return;
+      }
+      const bots = room.players.filter((p) => p.isBot);
+      if (!bots.length) return;
+      const randomBot = bots[Math.floor(Math.random() * bots.length)];
+      const now = Date.now();
+      if ((room.cualEs.penalties[randomBot.id] || 0) > now) return;
+
+      const botCard = room.cualEs.playerCards[randomBot.id] || [];
+      const center = room.cualEs.centerCard || [];
+      const matchSym = botCard.find((s) => center.includes(s));
+      if (matchSym !== undefined && Math.random() < 0.45) {
+        handleCualEsClick(room, randomBot, matchSym);
+      }
+    }, 2800);
+  }
+}
+
+function handleCualEsClick(room, player, symbolId) {
+  if (!room.cualEs || room.status !== 'playing') {
+    return { ok: false, error: 'La partida no está activa.' };
+  }
+
+  const now = Date.now();
+  const penaltyUntil = room.cualEs.penalties[player.id] || 0;
+
+  if (now < penaltyUntil) {
+    const remainingSec = ((penaltyUntil - now) / 1000).toFixed(1);
+    return {
+      ok: false,
+      penalized: true,
+      penaltyUntil,
+      error: `⏳ Estás penalizado por ${remainingSec}s más.`
+    };
+  }
+
+  const playerCard = room.cualEs.playerCards[player.id] || [];
+  const centerCard = room.cualEs.centerCard || [];
+
+  const isInPlayerCard = playerCard.includes(symbolId);
+  const isInCenterCard = centerCard.includes(symbolId);
+  const symObj = CUAL_ES_SYMBOLS[symbolId] || { icon: '❓', name: 'Símbolo' };
+
+  // ¡ACIERTO! El símbolo está tanto en la carta del jugador como en la carta central
+  if (isInPlayerCard && isInCenterCard) {
+    // El jugador se lleva la carta central como su nueva carta activa
+    room.cualEs.playerCards[player.id] = centerCard;
+    room.cualEs.scores[player.id] = (room.cualEs.scores[player.id] || 0) + 1;
+    room.cualEs.lastMatch = {
+      playerId: player.id,
+      playerName: player.name,
+      playerAvatar: player.avatar,
+      symbol: symObj,
+      timestamp: now
+    };
+
+    addLog(
+      room,
+      `⚡ ¡${player.avatar.icon} ${player.name} encontró "${symObj.icon} ${symObj.name}"! (+1 carta, total: ${room.cualEs.scores[player.id]}).`,
+      'success'
+    );
+
+    io.to(room.code).emit('cual_es_point', {
+      playerId: player.id,
+      playerName: player.name,
+      symbol: symObj,
+      score: room.cualEs.scores[player.id]
+    });
+
+    // Sacar nueva carta central o finalizar si se acabó el mazo
+    if (room.cualEs.deck.length > 0) {
+      room.cualEs.centerCard = room.cualEs.deck.pop();
+      room.cualEs.remainingDeckCount = room.cualEs.deck.length;
+    } else {
+      room.cualEs.centerCard = [];
+      room.cualEs.remainingDeckCount = 0;
+      finishCualEsGame(room);
+    }
+
+    broadcastRoomState(room);
+    return { ok: true, match: true, symbol: symObj };
+  }
+
+  // ¡ERROR! El jugador pulsó un dibujo que NO se repite entre su carta y la central -> 3 SEGUNDOS DE PENALIZACIÓN
+  const newPenaltyUntil = now + 3000;
+  room.cualEs.penalties[player.id] = newPenaltyUntil;
+
+  addLog(
+    room,
+    `❌ ${player.name} falló al pulsar "${symObj.icon} ${symObj.name}" y recibe 3 segundos de congelamiento.`,
+    'danger'
+  );
+
+  io.to(room.code).emit('cual_es_penalty', {
+    playerId: player.id,
+    playerName: player.name,
+    symbol: symObj,
+    penaltyUntil: newPenaltyUntil
+  });
+
+  broadcastRoomState(room);
+  return {
+    ok: false,
+    match: false,
+    penalized: true,
+    penaltyUntil: newPenaltyUntil,
+    error: `❌ ¡"${symObj.icon} ${symObj.name}" no coincide! 3 segundos de penalización.`
+  };
+}
+
+function finishCualEsGame(room) {
+  if (room.cualEsBotTimer) {
+    clearInterval(room.cualEsBotTimer);
+    room.cualEsBotTimer = null;
+  }
+
+  room.status = 'finished';
+  let bestPlayer = room.players[0];
+  let bestScore = -1;
+
+  room.players.forEach((p) => {
+    const sc = room.cualEs.scores[p.id] || 0;
+    if (sc > bestScore) {
+      bestScore = sc;
+      bestPlayer = p;
+    }
+  });
+
+  room.winner = bestPlayer;
+  addLog(
+    room,
+    `🏆 ¡Fin del mazo en "¿Cuál es?"! Ganador: ${bestPlayer.avatar.icon} ${bestPlayer.name} con ${bestScore} cartas ganadas.`,
+    'success'
+  );
 }
 
 const PORT = process.env.PORT || 3000;

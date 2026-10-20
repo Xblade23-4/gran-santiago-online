@@ -83,6 +83,55 @@ async function runTests() {
     assert.strictEqual(room.properties[1].houses, 1, 'Av. Pajaritos debe tener 1 casa');
     console.log('✅ Construcción de casas y monopolio por sector verificados.');
 
+    // 7. Probar el segundo juego: "¿Cuál es?" (coincidencias de cartas y penalización de 3s)
+    const host2 = createClient();
+    await new Promise((r) => host2.on('connect', r));
+    const createCualEs = await new Promise((r) =>
+      host2.emit(
+        'create_room',
+        { playerName: 'HostCualEs', avatarId: 'moai', gameType: 'cual_es', playerId: 'ce1' },
+        r
+      )
+    );
+    assert.strictEqual(createCualEs.ok, true, 'Sala de ¿Cuál es? debe crearse');
+    const ceCode = createCualEs.roomCode;
+
+    const p2Client = createClient();
+    await new Promise((r) => p2Client.on('connect', r));
+    await new Promise((r) =>
+      p2Client.emit('join_room', { roomCode: ceCode, playerName: 'Retador', playerId: 'ce2' }, r)
+    );
+
+    const startCe = await new Promise((r) => host2.emit('start_game', {}, r));
+    assert.strictEqual(startCe.ok, true, 'Debe iniciar ¿Cuál es?');
+
+    const ceRoom = rooms.get(ceCode);
+    const myCard = ceRoom.cualEs.playerCards['ce1'];
+    const centerCard = ceRoom.cualEs.centerCard;
+
+    // Verificar propiedad matemática: exactamente 1 símbolo en común
+    const commonSymbols = myCard.filter((s) => centerCard.includes(s));
+    assert.strictEqual(commonSymbols.length, 1, 'Entre dos cartas cualesquiera debe haber exactamente 1 símbolo en común');
+    console.log('✅ Mazo de "¿Cuál es?" verificado: exactamente 1 símbolo en común entre cualquier par de cartas.');
+
+    // Hacer clic en el símbolo correcto
+    const rightClick = await new Promise((r) =>
+      host2.emit('cual_es_click', { symbolId: commonSymbols[0] }, r)
+    );
+    assert.strictEqual(rightClick.ok, true, 'Clic en el símbolo repetido debe dar punto');
+    assert.strictEqual(ceRoom.cualEs.scores['ce1'], 2, 'El puntaje de cartas de ce1 debe subir a 2');
+
+    // Hacer clic en un símbolo incorrecto para verificar los 3 segundos de penalización
+    const wrongSym = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].find(
+      (s) => !ceRoom.cualEs.playerCards['ce1'].includes(s)
+    );
+    const wrongClick = await new Promise((r) =>
+      host2.emit('cual_es_click', { symbolId: wrongSym }, r)
+    );
+    assert.strictEqual(wrongClick.ok, false, 'Clic erróneo debe fallar');
+    assert.strictEqual(wrongClick.penalized, true, 'Clic erróneo debe activar penalización de 3 segundos');
+    console.log('✅ Penalización de 3 segundos anti-spam verificada en "¿Cuál es?".');
+
     console.log('\n🎉 ¡TODAS LAS PRUEBAS AUTOMATIZADAS PASARON EXITOSAMENTE!');
   } finally {
     clients.forEach((c) => c.close());

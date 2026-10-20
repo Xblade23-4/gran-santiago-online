@@ -27,14 +27,18 @@ function formatCompactCLP(amount) {
 let boardMeta = {
   COLOR_GROUPS: {},
   PLAYER_AVATARS: [],
-  BOARD_TILES: []
+  BOARD_TILES: [],
+  CUAL_ES_SYMBOLS: []
 };
 
 let myPlayerId = localStorage.getItem('gso_playerId') || ('p_' + Math.random().toString(36).substring(2, 10));
 localStorage.setItem('gso_playerId', myPlayerId);
 
 let selectedAvatarId = 'condorito';
+let selectedGameType = 'santiago';
 let currentRoomState = null;
+let myPenaltyUntil = 0;
+let penaltyIntervalId = null;
 let lastKnownTurnPlayerId = null;
 let turnOverlayTimer = null;
 let displayedPositions = {}; // { [playerId]: tileIndex }
@@ -465,6 +469,37 @@ function switchScreen(screenId) {
 }
 
 function bindUIEvents() {
+  // Selector de Modo de Juego en pantalla de inicio
+  const btnModeSantiago = document.getElementById('mode-btn-santiago');
+  const btnModeCuales = document.getElementById('mode-btn-cuales');
+  const moneyGroup = document.getElementById('group-starting-money');
+
+  if (btnModeSantiago && btnModeCuales) {
+    btnModeSantiago.addEventListener('click', () => {
+      selectedGameType = 'santiago';
+      btnModeSantiago.classList.add('selected');
+      btnModeCuales.classList.remove('selected');
+      if (moneyGroup) moneyGroup.style.display = 'block';
+    });
+    btnModeCuales.addEventListener('click', () => {
+      selectedGameType = 'cual_es';
+      btnModeCuales.classList.add('selected');
+      btnModeSantiago.classList.remove('selected');
+      if (moneyGroup) moneyGroup.style.display = 'none';
+    });
+  }
+
+  // Selector de Modo en el Lobby
+  document.getElementById('btn-lobby-mode-santiago')?.addEventListener('click', () => {
+    socket.emit('set_game_type', { gameType: 'santiago' });
+  });
+  document.getElementById('btn-lobby-mode-cuales')?.addEventListener('click', () => {
+    socket.emit('set_game_type', { gameType: 'cual_es' });
+  });
+  document.getElementById('btn-return-lobby')?.addEventListener('click', () => {
+    socket.emit('return_to_lobby');
+  });
+
   // Crear sala
   document.getElementById('btn-create-room').addEventListener('click', () => {
     const playerName = document.getElementById('input-player-name').value.trim() || 'Santiaguino';
@@ -473,7 +508,7 @@ function bindUIEvents() {
 
     socket.emit(
       'create_room',
-      { playerName, avatarId: selectedAvatarId, startingMoney, playerId: myPlayerId },
+      { playerName, avatarId: selectedAvatarId, startingMoney, gameType: selectedGameType, playerId: myPlayerId },
       (res) => {
         if (res && res.ok) {
           window.history.replaceState({}, '', `?sala=${res.roomCode}`);
@@ -690,12 +725,18 @@ socket.on('public_rooms', (roomsList) => {
 
   container.innerHTML = '';
   roomsList.forEach((r) => {
+    const isCualEs = r.gameType === 'cual_es';
+    const gameBadge = isCualEs ? '🔍 ¿Cuál es?' : '🚇 Gran Santiago';
+    const subInfo = isCualEs
+      ? `👥 ${r.playerCount}/${r.maxPlayers} jugadores • Agilidad Visual`
+      : `👥 ${r.playerCount}/${r.maxPlayers} jugadores • Capital: ${formatCLP(r.startingMoney)}`;
+
     const item = document.createElement('div');
     item.className = 'room-item';
     item.innerHTML = `
       <div class="room-item-info">
-        <strong>${r.code}</strong> — Mesa de ${r.hostName}
-        <small>👥 ${r.playerCount}/${r.maxPlayers} jugadores • Capital: ${formatCLP(r.startingMoney)}</small>
+        <strong>${r.code}</strong> • <span style="color:#facc15">${gameBadge}</span> — Mesa de ${r.hostName}
+        <small>${subInfo}</small>
       </div>
       <button class="btn btn-accent btn-sm">Unirse</button>
     `;
@@ -717,7 +758,12 @@ function applyIncomingRoomState(state) {
     switchScreen('screen-game');
     renderGame(state);
 
-    if (state.status === 'playing' && activePlayer && activePlayer.id !== prevTurnId) {
+    if (
+      state.gameType !== 'cual_es' &&
+      state.status === 'playing' &&
+      activePlayer &&
+      activePlayer.id !== prevTurnId
+    ) {
       lastKnownTurnPlayerId = activePlayer.id;
       triggerTurnChangeAnimation(activePlayer, activePlayer.id === myPlayerId);
       const turnBanner = document.getElementById('turn-banner');
@@ -832,15 +878,138 @@ socket.on('card_drawn', (payload) => {
   showDrawnCardNotification(payload);
 });
 
+socket.on('cual_es_point', ({ playerId, playerName, symbol }) => {
+  if (playerId === myPlayerId) {
+    playSoundEffect('buy');
+  } else {
+    playTone(480, 0.1, 'sine');
+  }
+  const matchBanner = document.getElementById('cuales-last-match');
+  if (matchBanner && symbol) {
+    matchBanner.innerHTML = `⚡ <strong>${playerName}</strong> encontró <strong>${symbol.icon} ${symbol.name}</strong> y ganó la carta!`;
+  }
+});
+
+socket.on('cual_es_penalty', ({ playerId, penaltyUntil, symbol }) => {
+  if (playerId === myPlayerId) {
+    playTone(170, 0.22, 'sawtooth');
+    setTimeout(() => playTone(140, 0.28, 'sawtooth'), 140);
+    startMyPenaltyCountdown(penaltyUntil);
+    showToast(`❄️ ¡"${symbol?.icon || ''} ${symbol?.name || ''}" no coincide! 3s de penalización.`);
+  }
+});
+
+function startMyPenaltyCountdown(untilTimestamp) {
+  myPenaltyUntil = untilTimestamp;
+  const banner = document.getElementById('cuales-penalty-banner');
+  const timerEl = document.getElementById('cuales-penalty-timer');
+  const centerCardEl = document.getElementById('cuales-center-card');
+  const myCardEl = document.getElementById('cuales-my-card');
+
+  if (penaltyIntervalId) clearInterval(penaltyIntervalId);
+
+  const updateTick = () => {
+    const remMs = myPenaltyUntil - Date.now();
+    if (remMs <= 0) {
+      clearInterval(penaltyIntervalId);
+      penaltyIntervalId = null;
+      if (banner) banner.classList.add('hidden');
+      if (centerCardEl) centerCardEl.classList.remove('penalized-card');
+      if (myCardEl) myCardEl.classList.remove('penalized-card');
+      return;
+    }
+    if (banner) banner.classList.remove('hidden');
+    if (centerCardEl) centerCardEl.classList.add('penalized-card');
+    if (myCardEl) myCardEl.classList.add('penalized-card');
+    if (timerEl) timerEl.textContent = (remMs / 1000).toFixed(1);
+  };
+
+  updateTick();
+  penaltyIntervalId = setInterval(updateTick, 80);
+}
+
+// Posiciones geométricas dentro de un círculo para los 8 dibujos de cada carta de "¿Cuál es?"
+const CUAL_ES_SLOTS = [
+  { x: 50, y: 50, scale: 1.12 }, // Centro
+  { x: 50, y: 19, scale: 0.96 }, // Arriba
+  { x: 76, y: 31, scale: 1.02 }, // Arriba-Derecha
+  { x: 81, y: 59, scale: 0.94 }, // Abajo-Derecha
+  { x: 64, y: 81, scale: 1.04 }, // Inferior-Derecha
+  { x: 36, y: 81, scale: 0.95 }, // Inferior-Izquierda
+  { x: 19, y: 59, scale: 1.05 }, // Abajo-Izquierda
+  { x: 24, y: 31, scale: 0.98 }  // Arriba-Izquierda
+];
+
+function renderCualEsCircleCard(containerId, symbolIds, cardSeed = 0) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!symbolIds || !symbolIds.length) {
+    container.innerHTML = `<div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#0f172a; font-weight:800;">🏁 Fin del Mazo</div>`;
+    return;
+  }
+
+  symbolIds.forEach((symId, idx) => {
+    const sym = boardMeta.CUAL_ES_SYMBOLS[symId] || { id: symId, icon: '❓', name: '?' };
+    const slot = CUAL_ES_SLOTS[idx % CUAL_ES_SLOTS.length];
+    const rot = (((symId * 37 + idx * 53 + cardSeed * 19) % 50) - 25);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cuales-symbol-btn';
+    btn.style.left = `${slot.x}%`;
+    btn.style.top = `${slot.y}%`;
+    btn.style.transform = `translate(-50%, -50%) rotate(${rot}deg) scale(${slot.scale})`;
+    btn.title = `Hacer clic en ${sym.name}`;
+    btn.innerHTML = `
+      <span class="sym-emoji">${sym.icon}</span>
+      <span class="sym-label">${sym.name}</span>
+    `;
+
+    btn.addEventListener('click', () => {
+      if (Date.now() < myPenaltyUntil) return;
+      socket.emit('cual_es_click', { symbolId: symId }, (res) => {
+        if (res && res.penalized && res.penaltyUntil) {
+          startMyPenaltyCountdown(res.penaltyUntil);
+        }
+      });
+    });
+
+    container.appendChild(btn);
+  });
+}
+
 function renderLobby(state) {
   document.getElementById('lobby-room-code').textContent = state.code;
   document.getElementById('lobby-player-count').textContent = state.players.length;
 
   const isHost = state.hostId === myPlayerId;
+  const isCualEs = state.gameType === 'cual_es';
+
+  const gameLabel = document.getElementById('lobby-current-game-label');
+  if (gameLabel) {
+    gameLabel.textContent = isCualEs
+      ? '🔍 ¿Cuál es? (Rapidez Visual y Coincidencias)'
+      : '🚇 Gran Santiago Online (Propiedades en $ CLP)';
+  }
+
+  const hostSwitch = document.getElementById('lobby-host-mode-switch');
+  if (hostSwitch) {
+    hostSwitch.style.display = isHost ? 'flex' : 'none';
+    document.getElementById('btn-lobby-mode-santiago').className =
+      'btn btn-sm ' + (!isCualEs ? 'btn-accent' : 'btn-secondary');
+    document.getElementById('btn-lobby-mode-cuales').className =
+      'btn btn-sm ' + (isCualEs ? 'btn-accent' : 'btn-secondary');
+  }
+
   document.getElementById('btn-add-bot').style.display = isHost && state.players.length < 8 ? 'inline-flex' : 'none';
 
   const startBtn = document.getElementById('btn-start-game');
   startBtn.disabled = !isHost || state.players.length < 2;
+  startBtn.textContent = isCualEs
+    ? '🚀 ¡Iniciar Partida de ¿Cuál es?!'
+    : '🚀 ¡Iniciar Partida en Gran Santiago!';
   document.getElementById('lobby-status-hint').textContent = isHost
     ? (state.players.length >= 2
       ? `¡Listos para partir con ${state.players.length} jugadores!`
@@ -879,6 +1048,34 @@ function renderLobby(state) {
 
 function renderGame(state) {
   document.getElementById('game-room-code').textContent = state.code;
+  const isCualEs = state.gameType === 'cual_es';
+
+  const boardGridEl = document.getElementById('board-grid');
+  const cualesArenaEl = document.getElementById('cuales-arena');
+  const santiagoPortfolioEl = document.getElementById('santiago-portfolio-panel');
+  const cualesRulesEl = document.getElementById('cuales-rules-panel');
+  const sidebarTitleEl = document.getElementById('sidebar-players-title');
+  const returnLobbyBtn = document.getElementById('btn-return-lobby');
+
+  boardGridEl.classList.toggle('hidden', isCualEs);
+  cualesArenaEl.classList.toggle('hidden', !isCualEs);
+  santiagoPortfolioEl.classList.toggle('hidden', isCualEs);
+  cualesRulesEl.classList.toggle('hidden', !isCualEs);
+
+  if (returnLobbyBtn) {
+    returnLobbyBtn.classList.toggle('hidden', state.hostId !== myPlayerId);
+  }
+
+  if (sidebarTitleEl) {
+    sidebarTitleEl.textContent = isCualEs ? '🏆 Ranking de Cartas' : '👥 Magnates en Competencia';
+  }
+
+  if (isCualEs) {
+    renderCualEsGame(state);
+    renderLogsAndChat(state);
+    return;
+  }
+
   document.getElementById('center-pot-amount').textContent = formatCLP(state.pot);
 
   // Actualizar dados
@@ -1011,6 +1208,65 @@ function renderGame(state) {
 
   // Crónica Financiera y Chat
   renderLogsAndChat(state);
+}
+
+function renderCualEsGame(state) {
+  const ce = state.cualEs;
+  if (!ce) return;
+
+  document.getElementById('cuales-remaining-count').textContent = ce.remainingDeckCount || 0;
+  const myScore = ce.scores?.[myPlayerId] || 1;
+  document.getElementById('cuales-my-score').textContent = myScore;
+
+  const matchBanner = document.getElementById('cuales-last-match');
+  if (state.status === 'finished' && state.winner) {
+    matchBanner.innerHTML = `🏆 ¡PARTIDA TERMINADA! Ganador: <strong>${state.winner.avatar.icon} ${state.winner.name}</strong> con ${ce.scores?.[state.winner.id] || 0} cartas!`;
+  } else if (ce.lastMatch) {
+    matchBanner.innerHTML = `⚡ Última carta ganada por <strong>${ce.lastMatch.playerAvatar?.icon || ''} ${ce.lastMatch.playerName}</strong> con <strong>${ce.lastMatch.symbol.icon} ${ce.lastMatch.symbol.name}</strong>`;
+  } else {
+    matchBanner.textContent = '¡Encuentra y haz clic en el único dibujo idéntico entre ambas cartas!';
+  }
+
+  // Verificar si tengo penalización activa
+  const serverPenalty = ce.penalties?.[myPlayerId] || 0;
+  if (serverPenalty > Date.now()) {
+    startMyPenaltyCountdown(serverPenalty);
+  }
+
+  // Renderizar Carta Central y Mi Carta Activa
+  const centerCard = ce.centerCard || [];
+  const myCard = ce.playerCards?.[myPlayerId] || [];
+
+  renderCualEsCircleCard('cuales-center-card', centerCard, ce.remainingDeckCount || 1);
+  renderCualEsCircleCard('cuales-my-card', myCard, myScore);
+
+  // Lista lateral de jugadores ordenada por puntaje en ¿Cuál es?
+  const playersList = document.getElementById('players-list');
+  playersList.innerHTML = '';
+
+  const sortedPlayers = [...state.players].sort(
+    (a, b) => (ce.scores?.[b.id] || 0) - (ce.scores?.[a.id] || 0)
+  );
+
+  sortedPlayers.forEach((p, idx) => {
+    const row = document.createElement('div');
+    const isPenalized = (ce.penalties?.[p.id] || 0) > Date.now();
+    row.className = 'player-row' + (idx === 0 ? ' active-turn' : '');
+    row.style.borderLeftColor = p.avatar.color;
+
+    const pScore = ce.scores?.[p.id] || 0;
+    row.innerHTML = `
+      <div class="p-info">
+        <span class="p-avatar">${p.avatar.icon}</span>
+        <div>
+          <div class="p-name">${p.name} ${p.id === myPlayerId ? '(Tú)' : ''}</div>
+          <span class="p-status-tag">${isPenalized ? '❄️ Penalizado (3s)' : `🃏 Buscando coincidencia...`}</span>
+        </div>
+      </div>
+      <div class="p-money">${pScore} 🃏</div>
+    `;
+    playersList.appendChild(row);
+  });
 }
 
 function renderMyProperties(state) {

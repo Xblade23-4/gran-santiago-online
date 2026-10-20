@@ -50,6 +50,26 @@
           <div class="divider"><span>CREAR NUEVA PARTIDA</span></div>
 
           <div class="form-group">
+            <label>Selecciona el Juego de Mesa</label>
+            <div class="game-mode-selector">
+              <button type="button" id="mode-btn-santiago" class="mode-option selected" data-mode="santiago">
+                <span class="mode-icon">🚇</span>
+                <div>
+                  <strong>Gran Santiago</strong>
+                  <small>Propiedades y Pesos CLP</small>
+                </div>
+              </button>
+              <button type="button" id="mode-btn-cuales" class="mode-option" data-mode="cual_es">
+                <span class="mode-icon">🔍</span>
+                <div>
+                  <strong>¿Cuál es?</strong>
+                  <small>Agilidad Visual y Cartas</small>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group" id="group-starting-money">
             <label for="select-starting-money">Capital Inicial BancoEstado ($ CLP)</label>
             <select id="select-starting-money">
               <option value="1500000" selected>$1.500.000 CLP (Estándar Oficial)</option>
@@ -59,7 +79,7 @@
           </div>
 
           <button id="btn-create-room" class="btn btn-primary btn-lg btn-block">
-            🚇 Crear Sala Online (2 - 8 Jugadores)
+            🚀 Crear Sala Online (2 - 8 Jugadores)
           </button>
 
           <div class="divider"><span>O ÚNETE CON CÓDIGO</span></div>
@@ -81,12 +101,11 @@
           </div>
 
           <div class="features-box">
-            <h3>✨ Reglas Oficiales Gran Santiago</h3>
+            <h3>✨ 2 Juegos Multijugador Incluidos (2 a 8 Jugadores)</h3>
             <ul>
-              <li>💰 <strong>Economía en CLP:</strong> Sueldo de <strong>$200.000</strong> cada vez que pasas por Plaza Baquedano.</li>
-              <li>🏗️ <strong>Monopolio y Edificación:</strong> Al reunir todas las calles de un sector (color), cobras doble arriendo y puedes construir hasta 4 Casas y 1 Torre Costanera.</li>
-              <li>🎡 <strong>Pozo Parque O'Higgins:</strong> Todo lo recaudado por el SII y Pórticos TAG se acumula en la Fonda Libre del Parque O'Higgins.</li>
-              <li>🤝 <strong>Bolsa de Comercio:</strong> Negocia propiedades y efectivo en tiempo real con cualquier jugador.</li>
+              <li>🚇 <strong>Gran Santiago Online:</strong> Compra comunas, estaciones de Metro y edifica en Sanhattan con economía en Pesos Chilenos ($ CLP).</li>
+              <li>🔍 <strong>¿Cuál es? (Coincidencias):</strong> Rapidez visual y agilidad mental. Entre tu carta y la carta del centro siempre hay <strong>un único dibujo idéntico</strong>. ¡Haz clic sobre el objeto repetido antes que los demás!</li>
+              <li>❄️ <strong>Juego Justo Anti-Spam:</strong> En <em>¿Cuál es?</em>, si te equivocas y pulsas un objeto que no está en ambas cartas, recibes <strong>3 segundos de penalización</strong> sin poder hacer clic.</li>
             </ul>
           </div>
         </section>
@@ -106,6 +125,15 @@
         <div class="lobby-share-actions">
           <button id="btn-copy-link" class="btn btn-secondary">🔗 Copiar Enlace de Invitación</button>
           <button id="btn-leave-lobby" class="btn btn-danger-outline">Salir</button>
+        </div>
+      </div>
+
+      <!-- Selector de juego en el Lobby -->
+      <div class="lobby-mode-bar">
+        <span>🎮 Juego Seleccionado: <strong id="lobby-current-game-label">🚇 Gran Santiago Online</strong></span>
+        <div id="lobby-host-mode-switch" class="lobby-mode-buttons">
+          <button type="button" id="btn-lobby-mode-santiago" class="btn btn-sm btn-accent">🚇 Gran Santiago</button>
+          <button type="button" id="btn-lobby-mode-cuales" class="btn btn-sm btn-secondary">🔍 ¿Cuál es?</button>
         </div>
       </div>
 
@@ -142,11 +170,11 @@
         </div>
 
         <div class="panel-box">
-          <h3 class="panel-title">👥 Magnates en Competencia</h3>
+          <h3 class="panel-title" id="sidebar-players-title">👥 Magnates en Competencia</h3>
           <div id="players-list" class="players-list"></div>
         </div>
 
-        <div class="panel-box my-portfolio-box">
+        <div class="panel-box my-portfolio-box" id="santiago-portfolio-panel">
           <div class="panel-header-row">
             <h3 class="panel-title">🏢 Mis Escrituras (<span id="my-props-count">0</span>)</h3>
             <button id="btn-open-trade" class="btn btn-accent btn-xs">🤝 Negociar</button>
@@ -155,10 +183,61 @@
             <p class="empty-small">Aún no tienes propiedades. ¡Lanza los dados y compra comunas!</p>
           </div>
         </div>
+
+        <div class="panel-box my-portfolio-box hidden" id="cuales-rules-panel">
+          <h3 class="panel-title">🔍 Reglas de ¿Cuál es?</h3>
+          <ul class="cuales-rules-list">
+            <li>🎯 Entre <strong>Tu Carta</strong> y la <strong>Carta Central</strong> siempre hay <strong>1 único objeto repetido</strong>.</li>
+            <li>👆 Haz clic sobre ese dibujo (en tu carta o en la central) antes que los demás para llevarte la carta.</li>
+            <li>❄️ <strong>¡No adivines al azar!</strong> Si haces clic en un dibujo que no coincide, quedarás <strong>congelado por 3 segundos</strong> sin poder jugar.</li>
+          </ul>
+          <button id="btn-return-lobby" class="btn btn-secondary btn-sm hidden" style="margin-top:auto;">
+            🔄 Volver a la Sala de Espera
+          </button>
+        </div>
       </aside>
 
-      <!-- CENTRO: TABLERO 11x11 DEL GRAN SANTIAGO -->
+      <!-- CENTRO: TABLERO 11x11 DEL GRAN SANTIAGO O ARENA DE ¿CUÁL ES? -->
       <section class="board-wrapper">
+        <!-- ARENA DEL JUEGO ¿CUÁL ES? -->
+        <div id="cuales-arena" class="cuales-arena hidden">
+          <div class="cuales-header">
+            <div class="cuales-title-badge">🔍 ¿CUÁL ES? • RAPIDEZ VISUAL</div>
+            <div class="cuales-deck-counter">
+              🃏 Cartas restantes en el mazo: <strong id="cuales-remaining-count">50</strong>
+            </div>
+          </div>
+
+          <div id="cuales-last-match" class="cuales-last-match">
+            ¡Encuentra y haz clic en el único dibujo idéntico entre ambas cartas!
+          </div>
+
+          <!-- Overlay de Penalización de 3 Segundos -->
+          <div id="cuales-penalty-banner" class="cuales-penalty-banner hidden">
+            <div class="penalty-icon">❄️</div>
+            <div>
+              <strong>¡TE EQUIVOCASTE! PENALIZACIÓN ACTIVA</strong>
+              <p>Bloqueado por <span id="cuales-penalty-timer">3.0</span> segundos...</p>
+            </div>
+          </div>
+
+          <div class="cuales-cards-stage">
+            <!-- Carta Central -->
+            <div class="cuales-card-wrapper">
+              <div class="cuales-card-label">🌟 CARTA CENTRAL (MAZO)</div>
+              <div id="cuales-center-card" class="cuales-circle-card center-deck-card"></div>
+            </div>
+
+            <div class="cuales-vs-divider">⚡</div>
+
+            <!-- Mi Carta Activa -->
+            <div class="cuales-card-wrapper">
+              <div class="cuales-card-label">👤 TU CARTA ACTIVA (<span id="cuales-my-score">1</span> ganadas)</div>
+              <div id="cuales-my-card" class="cuales-circle-card my-hand-card"></div>
+            </div>
+          </div>
+        </div>
+
         <div id="board-grid" class="board-grid">
           <!-- El centro del tablero (filas 2..10, columnas 2..10) -->
           <div class="board-center">
