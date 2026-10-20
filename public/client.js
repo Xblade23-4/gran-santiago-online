@@ -441,10 +441,12 @@ function buildBoardDOM() {
         <div class="tile-tokens" id="tokens-tile-${tile.id}"></div>
       `;
     } else {
+      const hasBadgeIcon = ['station', 'utility', 'chance', 'community', 'tax'].includes(tile.type);
+      const barInitialIcon = tile.type === 'station' ? '🚇' : (tile.type === 'utility' ? (tile.icon || '⚡') : '');
       tileEl.innerHTML = `
-        <div class="tile-color-bar" id="bar-tile-${tile.id}" style="background:${barColor}"></div>
+        <div class="tile-color-bar" id="bar-tile-${tile.id}" style="background:${barColor}">${barInitialIcon}</div>
         <div class="tile-name">${tile.shortName || tile.name}</div>
-        ${tile.icon ? `<div class="tile-icon" style="font-size:0.95rem">${tile.icon}</div>` : ''}
+        ${tile.icon ? `<div class="${hasBadgeIcon ? 'tile-center-badge' : 'tile-icon'}" style="border-color:${barColor}">${tile.icon}</div>` : ''}
         <div class="tile-price">${tile.price ? formatCompactCLP(tile.price) : (tile.taxAmount ? '-' + formatCompactCLP(tile.taxAmount) : '')}</div>
         <div class="tile-tokens" id="tokens-tile-${tile.id}"></div>
         <div class="tile-owner-dot hidden" id="owner-dot-${tile.id}"></div>
@@ -1037,8 +1039,10 @@ function renderMyProperties(state) {
     else if (prop.houses === 5) badge = '🏙️ Torre';
     else if (prop.houses > 0) badge = `🏠x${prop.houses}`;
 
+    const typeIcon = tile.type === 'station' ? '🚇 ' : (tile.type === 'utility' ? `${tile.icon || '⚡'} ` : '🏘️ ');
+
     item.innerHTML = `
-      <span><strong>${tile.name}</strong></span>
+      <span><strong>${typeIcon}${tile.name}</strong></span>
       <span style="color:#0284c7; font-weight:800; font-size:0.75rem">${badge || formatCompactCLP(tile.price)}</span>
     `;
     item.addEventListener('click', () => openPropertyModal(tile.id));
@@ -1116,9 +1120,18 @@ function openPropertyModal(tileId) {
   const actionsBox = document.getElementById('prop-owner-actions');
 
   const groupInfo = tile.group ? boardMeta.COLOR_GROUPS[tile.group] : null;
-  header.style.background = groupInfo ? groupInfo.color : '#334155';
+  const headerColor = groupInfo ? groupInfo.color : '#334155';
+  header.style.background = headerColor;
   comunaEl.textContent = tile.comuna || groupInfo?.name || 'CASILLA ESPECIAL';
-  titleEl.textContent = tile.name;
+  titleEl.textContent = `${tile.icon ? tile.icon + ' ' : ''}${tile.name}`;
+
+  const emblemEl = document.getElementById('prop-dialog-emblem');
+  if (emblemEl) {
+    const bigIcon = tile.icon || (tile.type === 'property' ? '🏘️' : '📍');
+    emblemEl.textContent = bigIcon;
+    emblemEl.style.borderColor = headerColor;
+    emblemEl.classList.remove('hidden');
+  }
 
   priceEl.textContent = tile.price ? formatCLP(tile.price) : '—';
   rentTable.innerHTML = '';
@@ -1157,7 +1170,17 @@ function openPropertyModal(tileId) {
   } else if (tile.type === 'station') {
     tile.rents.forEach((r, i) => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>Con ${i + 1} Estación(es) de Metro</td><td>${formatCLP(r)}</td>`;
+      tr.innerHTML = `<td>🚇 Con ${i + 1} Estación(es) de Metro</td><td>${formatCLP(r)}</td>`;
+      rentTable.appendChild(tr);
+    });
+  } else if (tile.type === 'utility') {
+    const uIcon = tile.icon || '⚡';
+    [
+      { label: `${uIcon} Con 1 Servicio Básico`, val: '4.000 × Dados' },
+      { label: `⚡💧 Con Ambos Servicios (Enel + Aguas Andinas)`, val: '10.000 × Dados' }
+    ].forEach((row) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${row.label}</td><td>${row.val}</td>`;
       rentTable.appendChild(tr);
     });
   }

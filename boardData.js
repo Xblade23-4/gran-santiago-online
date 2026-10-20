@@ -468,6 +468,115 @@ const CHANCE_CARDS = [
     text: 'Te tocó poner la carne y las empanadas para todo el grupo. Paga $25.000 CLP a cada jugador activo.',
     action: 'pay_each_player',
     amount: 25000
+  },
+  {
+    title: 'Conciertazo en el Estadio Nacional',
+    text: 'Revendiste las entradas VIP que te sobraron en Ñuñoa. Ganaste $130.000 CLP.',
+    action: 'collect',
+    amount: 130000
+  },
+  {
+    title: '¡Falla en la Línea 1 del Metro!',
+    text: 'Tuviste que tomar taxi colectivo en hora punta por corte de energía. Paga $40.000 CLP.',
+    action: 'pay_tax',
+    amount: 40000
+  },
+  {
+    title: 'Viaje en Metro Tobalaba',
+    text: 'Toma la combinación en Metro Tobalaba. Si pasas por Plaza Baquedano, cobra tus $200.000 CLP.',
+    action: 'move_to',
+    target: 35
+  },
+  {
+    title: 'Compras en Barrio Patronato',
+    text: 'Avanza hasta Barrio Patronato para renovar todo tu clóset. Si pasas por la Partida, cobra $200.000 CLP.',
+    action: 'move_to',
+    target: 6
+  },
+  {
+    title: 'Cachureos en el Persa Biobío',
+    text: 'Avanza hasta Barrio Franklin (Persa Biobío). Si pasas por la Partida, cobra $200.000 CLP.',
+    action: 'move_to',
+    target: 9
+  },
+  {
+    title: 'Carrete en Pío Nono',
+    text: 'Avanza hasta Barrio Bellavista. Si pasas por la Partida, cobra $200.000 CLP.',
+    action: 'move_to',
+    target: 19
+  },
+  {
+    title: 'Bono Marzo Familiar',
+    text: 'El IPS depositó el Aporte Familiar Permanente en tu CuentaRUT. Cobras $90.000 CLP.',
+    action: 'collect',
+    amount: 90000
+  },
+  {
+    title: 'Alza en la Cuenta de la Luz (Enel)',
+    text: 'Subieron las tarifas eléctricas de invierno. Paga $55.000 CLP al pozo.',
+    action: 'pay_tax',
+    amount: 55000
+  },
+  {
+    title: 'Corte de Agua en tu Comuna',
+    text: 'Aguas Andinas te indemnizó por el corte programado del fin de semana. Recibes $65.000 CLP.',
+    action: 'collect',
+    amount: 65000
+  },
+  {
+    title: 'Rifa de Bomberos de Santiago',
+    text: 'Ganaste el segundo premio de la Gran Rifa del Cuerpo de Bomberos. Cobras $110.000 CLP.',
+    action: 'collect',
+    amount: 110000
+  },
+  {
+    title: 'Multa por Evasión en Red Movilidad',
+    text: 'Subieron los inspectores a la micro y no habías validado tu tarjeta Bip!. Paga multa de $60.000 CLP.',
+    action: 'pay_tax',
+    amount: 60000
+  },
+  {
+    title: 'Premio Pyme Corfo / Sercotec',
+    text: 'Tu emprendimiento santiaguino ganó el fondo concursable Capital Semilla. Recibes $220.000 CLP.',
+    action: 'collect',
+    amount: 220000
+  },
+  {
+    title: 'Revisión Técnica Rechazada',
+    text: 'Rechazaron tu auto por gases en la planta de La Florida. Paga $85.000 CLP en mecánico.',
+    action: 'pay_tax',
+    amount: 85000
+  },
+  {
+    title: 'Tarde de Café en Barrio Italia',
+    text: 'Avanza hasta Barrio Italia en Ñuñoa. Si pasas por la Partida, cobra $200.000 CLP.',
+    action: 'move_to',
+    target: 27
+  },
+  {
+    title: 'Pichanga de Media Semana',
+    text: 'Ganaron la apuesta del arriendo de cancha en Quilín. Cada jugador te paga $20.000 CLP.',
+    action: 'collect_each_player',
+    amount: 20000
+  },
+  {
+    title: 'Remodelación por Norma Antisísmica',
+    text: 'Refuerzo estructural tras temblor grado 6: Paga $30.000 CLP por cada casa y $110.000 CLP por cada torre.',
+    action: 'street_repairs',
+    perHouse: 30000,
+    perHotel: 110000
+  },
+  {
+    title: 'Tren a Estación Central',
+    text: 'Avanza hasta Metro Estación Central. Si pasas por Plaza Baquedano, cobra $200.000 CLP.',
+    action: 'move_to',
+    target: 5
+  },
+  {
+    title: 'Trámite en el Centro',
+    text: 'Avanza hasta Paseo Ahumada. Si pasas por la Partida, cobra tus $200.000 CLP.',
+    action: 'move_to',
+    target: 21
   }
 ];
 
@@ -479,7 +588,7 @@ const COMMUNITY_CARDS = [
     amount: 200000
   },
   {
-    title: ' ¡La Hora de tu Suerte!',
+    title: '¡La Hora de tu Suerte!',
     text: 'Tu número de RUT salió premiado en Polla Chilena de Beneficencia. Cobras $120.000 CLP.',
     action: 'collect',
     amount: 120000
@@ -519,6 +628,48 @@ const COMMUNITY_CARDS = [
     text: 'Vendiste tus antigüedades el domingo en el galpón Víctor Manuel. Recibes $90.000 CLP.',
     action: 'collect',
     amount: 90000
+  },
+  {
+    title: 'Raspe "Al Fin Le Achunté"',
+    text: 'Compraste un raspe en el kiosco de la esquina y salió premiado. Cobras $70.000 CLP.',
+    action: 'collect',
+    amount: 70000
+  },
+  {
+    title: 'Aguinaldo de Navidad',
+    text: 'Tu empresa pagó el aguinaldo de fin de año. Recibes $140.000 CLP.',
+    action: 'collect',
+    amount: 140000
+  },
+  {
+    title: 'Donación a la Teletón',
+    text: 'Te pusiste con la mano en el corazón en el Banco de Chile: Paga $50.000 CLP al pozo solidario.',
+    action: 'pay_tax',
+    amount: 50000
+  },
+  {
+    title: 'Herencia de la Tía de Providencia',
+    text: 'Recibiste un depósito a plazo en UF que dejó tu tía. Cobras $180.000 CLP.',
+    action: 'collect',
+    amount: 180000
+  },
+  {
+    title: 'Completada Bailable Vecinal',
+    text: 'Organizaste una completada en la junta de vecinos y fue éxito total. Cada jugador te compra tickets por $15.000 CLP.',
+    action: 'collect_each_player',
+    amount: 15000
+  },
+  {
+    title: 'Cuenta de Calefacción de Invierno',
+    text: 'El frío en Santiago estuvo implacable este mes. Paga $45.000 CLP.',
+    action: 'pay_tax',
+    amount: 45000
+  },
+  {
+    title: 'Beca de Excelencia Académica',
+    text: 'Obtuviste distinción máxima en la universidad. Recibes premio de $110.000 CLP.',
+    action: 'collect',
+    amount: 110000
   }
 ];
 
