@@ -12,16 +12,31 @@ const {
   CUAL_ES_SYMBOLS,
   generateCualEsDeck
 } = require('./boardData');
+const { GameManager } = require('./gameparty_server/gameManager');
+const { getCategories } = require('./gameparty_server/crosswords/puzzles');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Si alguien abre /?room=XXXX (enlace de Crucigrama o Doodle Party), redirigir a /gameparty/?room=XXXX
+app.get('/', (req, res, next) => {
+  if (req.query && req.query.room) {
+    return res.redirect(`/gameparty/?room=${encodeURIComponent(req.query.room)}`);
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' }
 });
+
+// Gestor de salas de GameParty Web (Crucigrama Party & Doodle Party / Pictionary)
+const gamePartyManager = new GameManager();
+gamePartyManager.setIo(io);
 
 // Almacenamiento en memoria de las salas de juego
 const rooms = new Map();
@@ -747,6 +762,15 @@ app.get('/api/board', (req, res) => {
   });
 });
 
+// Endpoints REST para GameParty Web (Crucigrama Party & Doodle Party)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', activeRooms: rooms.size + gamePartyManager.rooms.size });
+});
+
+app.get('/api/categories', (req, res) => {
+  res.json({ categories: getCategories() });
+});
+
 io.on('connection', (socket) => {
   let currentRoomCode = null;
   let currentPlayerId = null;
@@ -1315,7 +1339,230 @@ io.on('connection', (socket) => {
     broadcastRoomState(room);
   });
 
+  // ==========================================================================
+  // EVENTOS SOCKET.IO DE GAMEPARTY WEB (CRUCIGRAMA PARTY & DOODLE PARTY)
+  // ==========================================================================
+  socket.on('create-room', (data, callback) => {
+    try {
+      const room = gamePartyManager.createRoom({
+        hostSocketId: socket.id,
+        nickname: data?.nickname,
+        avatar: data?.avatar
+      });
+      socket.join(room.code);
+      if (typeof callback === 'function') {
+        callback({ success: true, roomCode: room.code, room });
+      } else {
+        socket.emit('room-state', room);
+      }
+    } catch (err) {
+      if (typeof callback === 'function') {
+        callback({ success: false, error: 'Error al crear la sala.' });
+      }
+    }
+  });
+
+  socket.on('vote-game', ({ gameType }) => {
+    const res = gamePartyManager.voteGame(socket.id, gameType);
+    if (res) {
+      io.to(res.roomCode).emit('room-state', res.room);
+    }
+  });
+
+  socket.on('start-game', async (options, callback) => {
+    try {
+      const res = await gamePartyManager.startGame(socket.id, options);
+      if (res.error) {
+        if (typeof callback === 'function') callback({ success: false, error: res.error });
+        return;
+      }
+      io.to(res.roomCode).emit('room-state', res.room);
+      if (typeof callback === 'function') callback({ success: true, room: res.room });
+    } catch (err) {
+      if (typeof callback === 'function') callback({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('return-to-lobby', (callback) => {
+    const res = gamePartyManager.returnToLobby(socket.id);
+    if (res?.error) {
+      if (typeof callback === 'function') callback({ success: false, error: res.error });
+      return;
+    }
+    if (res) {
+      io.to(res.roomCode).emit('room-state', res.room);
+      if (typeof callback === 'function') callback({ success: true, room: res.room });
+    }
+  });
+
+  socket.on('join-room', (data, callback) => {
+    try {
+      const result = gamePartyManager.joinRoom({
+        roomCode: data?.roomCode,
+        socketId: socket.id,
+        nickname: data?.nickname,
+        avatar: data?.avatar
+      });
+      if (result.error) {
+        if (typeof callback === 'function') {
+          callback({ success: false, error: result.error });
+        } else {
+          socket.emit('error-message', { message: result.error });
+        }
+        return;
+      }
+      const { room } = result;
+      socket.join(room.code);
+      if (typeof callback === 'function') {
+        callback({ success: true, roomCode: room.code, room });
+      }
+      io.to(room.code).emit('room-state', room);
+
+      const pictionary = gamePartyManager.getPictionaryByRoomCode(room.code);
+      if (room.gameType === 'pictionary' && pictionary) {
+        socket.emit('pictionary-state', pictionary.getPublicState());
+      }
+    } catch (err) {
+      if (typeof callback === 'function') {
+        callback({ success: false, error: 'Error al unirse a la sala.' });
+      }
+    }
+  });
+
+  socket.on('cursor-move', ({ row, col, direction }) => {
+    const result = gamePartyManager.updateCursor(socket.id, { row, col, direction });
+    if (result) {
+      socket.to(result.roomCode).emit('player-cursor', {
+        playerId: result.playerId,
+        cursor: result.cursor
+      });
+    }
+  });
+
+  socket.on('cell-update', ({ row, col, letter }) => {
+    const result = gamePartyManager.updateCell(socket.id, { row, col, letter });
+    if (result) {
+      io.to(result.roomCode).emit('cell-updated', {
+        row: result.row,
+        col: result.col,
+        cell: result.cell,
+        players: result.players,
+        solvedClues: result.solvedClues
+      });
+      if (result.newWordsSolved.length > 0) {
+        io.to(result.roomCode).emit('words-solved', {
+          words: result.newWordsSolved,
+          players: result.players
+        });
+      }
+      if (result.isGameOver) {
+        io.to(result.roomCode).emit('game-over', {
+          players: result.players,
+          endTime: Date.now()
+        });
+      }
+    }
+  });
+
+  socket.on('request-hint', ({ row, col }) => {
+    const result = gamePartyManager.requestHint(socket.id, { row, col });
+    if (result) {
+      io.to(result.roomCode).emit('cell-updated', {
+        row: result.row,
+        col: result.col,
+        cell: result.cell,
+        players: result.players,
+        solvedClues: result.solvedClues
+      });
+      if (result.newWordsSolved.length > 0) {
+        io.to(result.roomCode).emit('words-solved', {
+          words: result.newWordsSolved,
+          players: result.players
+        });
+      }
+      if (result.isGameOver) {
+        io.to(result.roomCode).emit('game-over', {
+          players: result.players,
+          endTime: Date.now()
+        });
+      }
+    }
+  });
+
+  socket.on('chat-message', ({ text }) => {
+    const result = gamePartyManager.addMessage(socket.id, text);
+    if (result) {
+      io.to(result.roomCode).emit('new-chat-message', result.message);
+    }
+  });
+
+  socket.on('quick-reaction', ({ emoji }) => {
+    const result = gamePartyManager.addReaction(socket.id, emoji);
+    if (result) {
+      io.to(result.roomCode).emit('floating-reaction', result.reaction);
+    }
+  });
+
+  socket.on('restart-game', async (options) => {
+    try {
+      const result = await gamePartyManager.restartGame(socket.id, options);
+      if (result) {
+        io.to(result.roomCode).emit('room-state', result.room);
+      }
+    } catch (err) {
+      console.error('[RestartGame Error]:', err.message);
+    }
+  });
+
+  socket.on('pictionary-choose-word', ({ word, category, difficulty }) => {
+    const pictionary = gamePartyManager.getPictionaryBySocketId(socket.id);
+    if (pictionary) {
+      pictionary.selectWord(word, category, difficulty);
+    }
+  });
+
+  socket.on('pictionary-draw-stroke', (stroke) => {
+    const pictionary = gamePartyManager.getPictionaryBySocketId(socket.id);
+    if (pictionary) {
+      pictionary.addStroke(socket.id, stroke);
+    }
+  });
+
+  socket.on('pictionary-clear-canvas', () => {
+    const pictionary = gamePartyManager.getPictionaryBySocketId(socket.id);
+    if (pictionary) {
+      pictionary.clearCanvas(socket.id);
+    }
+  });
+
+  socket.on('pictionary-undo', () => {
+    const pictionary = gamePartyManager.getPictionaryBySocketId(socket.id);
+    if (pictionary) {
+      pictionary.undoStroke(socket.id);
+    }
+  });
+
+  socket.on('pictionary-guess', ({ text }) => {
+    const pictionary = gamePartyManager.getPictionaryBySocketId(socket.id);
+    if (pictionary) {
+      pictionary.handleGuess(socket.id, text);
+    }
+  });
+
+  socket.on('pictionary-restart', () => {
+    const pictionary = gamePartyManager.getPictionaryBySocketId(socket.id);
+    if (pictionary) {
+      pictionary.restartGame();
+    }
+  });
+
   socket.on('disconnect', () => {
+    // Limpiar sesión de GameParty si estaba en una sala de Crucigrama o Doodle Party
+    const gpLeave = gamePartyManager.leaveRoom(socket.id);
+    if (gpLeave && !gpLeave.isEmpty) {
+      io.to(gpLeave.roomCode).emit('room-state', gpLeave.room);
+    }
+
     if (!currentRoomCode || !rooms.has(currentRoomCode)) return;
     const room = rooms.get(currentRoomCode);
     const player = room.players.find((p) => p.id === currentPlayerId);

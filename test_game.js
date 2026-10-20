@@ -150,10 +150,24 @@ async function runTests() {
     assert.strictEqual(wrongClick.penalized, true, 'Clic erróneo debe activar penalización de 3 segundos');
     console.log('✅ Penalización de 3 segundos anti-spam verificada en "¿Cuál es?".');
 
+    // 8. Probar integración de GameParty Web (Crucigrama Party & Doodle Party) en el mismo servidor
+    const gpHost = createClient();
+    await new Promise((r) => gpHost.on('connect', r));
+    const gpCreateRes = await new Promise((r) =>
+      gpHost.emit('create-room', { nickname: 'AlvaroGP', avatar: '🦊' }, r)
+    );
+    assert.strictEqual(gpCreateRes.success, true, 'Sala de GameParty (Crucigrama/Doodle) debe crearse');
+    const gpStartRes = await new Promise((r) =>
+      gpHost.emit('start-game', { gameType: 'crossword', category: 'general', difficulty: 'Fácil' }, r)
+    );
+    assert.strictEqual(gpStartRes.success, true, 'Partida de Crucigrama Party debe iniciar en el servidor unificado');
+    console.log('✅ Integración de GameParty Web (Crucigrama Party & Doodle Party) verificada.');
+
     console.log('\n🎉 ¡TODAS LAS PRUEBAS AUTOMATIZADAS PASARON EXITOSAMENTE!');
   } finally {
     clients.forEach((c) => c.close());
     server.close();
+    process.exit(0);
   }
 }
 

@@ -1,7 +1,7 @@
 {
-  "name": "gran-santiago-online",
+  "name": "juegos-web-multijugador",
   "version": "1.0.0",
-  "description": "Gran Santiago Online - Juego de mesa multijugador en tiempo real (2 a 8 jugadores) con economia en Pesos Chilenos (CLP)",
+  "description": "Plataforma de Juegos Web Multijugador en Tiempo Real: Gran Santiago Online, ¿Cuál es?, Crucigrama Party y Doodle Party",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
