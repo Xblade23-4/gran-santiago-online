@@ -58,73 +58,342 @@ let inspectedTileId = null;
 let soundEnabled = true;
 let musicEnabled = true;
 let bgmIntervalId = null;
-let bgmNoteIndex = 0;
+let bgmStepIndex = 0;
+let currentAiSongIndex = 0;
+let noiseBuffer = null;
 
-// Efectos de sonido y Música de Fondo sintetizados (Web Audio API sin archivos externos)
+// Efectos de sonido y Motor Musical Multipista IA (Web Audio API en tiempo real)
 const audioCtx = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)
   ? new (window.AudioContext || window.webkitAudioContext)()
   : null;
 
-// Melodía alegre estilo Juego de Mesa / Lounge Santiaguino
-const BGM_MELODY = [
-  { f: 261.63, b: 196.00 }, // C4 + G3
-  { f: 329.63, b: 0 },      // E4
-  { f: 392.00, b: 130.81 }, // G4 + C3
-  { f: 523.25, b: 0 },      // C5
-  { f: 392.00, b: 196.00 }, // G4 + G3
-  { f: 329.63, b: 0 },      // E4
-  { f: 349.23, b: 174.61 }, // F4 + F3
-  { f: 440.00, b: 0 },      // A4
-  { f: 523.25, b: 130.81 }, // C5 + C3
-  { f: 440.00, b: 0 },      // A4
-  { f: 392.00, b: 196.00 }, // G4 + G3
-  { f: 329.63, b: 0 },      // E4
-  { f: 293.66, b: 146.83 }, // D4 + D3
-  { f: 349.23, b: 0 },      // F4
-  { f: 392.00, b: 196.00 }, // G4 + G3
-  { f: 493.88, b: 0 }       // B4
+// Tabla de frecuencias musicales (Hz) para composición multipista
+const N = {
+  _: 0,
+  A1: 55.00, C2: 65.41, D2: 73.42, E2: 82.41, F2: 87.31, G2: 98.00, A2: 110.00, B2: 123.47,
+  C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, B3: 246.94,
+  C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88,
+  C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00, B5: 987.77,
+  C6: 1046.50
+};
+
+// 3 Canciones completas compuestas por IA (64 pasos de semicorchea = Estrofa + Pre-Coro + Coro Explosivo)
+const AI_SONGS = [
+  {
+    name: 'Fiesta en Santiago (Electro-Party)',
+    bpm: 126,
+    leadWave: 'sawtooth',
+    bassWave: 'sawtooth',
+    // Progresión por cada compás de 16 pasos: Am -> F -> C -> G
+    chords: [
+      [N.A3, N.C4, N.E4],
+      [N.F3, N.A3, N.C4],
+      [N.C4, N.E4, N.G4],
+      [N.G3, N.B3, N.D4]
+    ],
+    // Bajo Funky Octavado (64 pasos)
+    bass: [
+      // Compás 1 (Am)
+      N.A2, N._, N.A3, N.A2, N._, N.A2, N.G2, N.A2, N.A2, N._, N.A3, N.E2, N._, N.G2, N.A2, N.E3,
+      // Compás 2 (F)
+      N.F2, N._, N.F3, N.F2, N._, N.F2, N.E2, N.F2, N.F2, N._, N.F3, N.C3, N._, N.C3, N.F2, N.G2,
+      // Compás 3 (C)
+      N.C2, N._, N.C3, N.C2, N._, N.C2, N.B2, N.C3, N.C2, N._, N.C3, N.G2, N._, N.A2, N.C3, N.E3,
+      // Compás 4 (G)
+      N.G2, N._, N.G3, N.G2, N._, N.G2, N.A2, N.B2, N.D3, N._, N.B2, N.G2, N.A2, N.B2, N.D3, N.E3
+    ],
+    // Melodía Principal Sintetizada IA (Estrofa rítmica + Coro pegajoso en octava alta)
+    lead: [
+      // Compás 1 (Am - Hook inicial)
+      N.E5, N._, N.C5, N.A4, N._, N.C5, N.E5, N._, N.G5, N.E5, N._, N.D5, N.C5, N.D5, N.E5, N._,
+      // Compás 2 (F - Respuesta melódica)
+      N.F5, N._, N.C5, N.A4, N._, N.C5, N.F5, N._, N.E5, N.D5, N._, N.C5, N.A4, N.C5, N.D5, N._,
+      // Compás 3 (C - Subida de energía / Coro)
+      N.G5, N._, N.E5, N.C5, N.E5, N.G5, N.A5, N._, N.G5, N.E5, N.C5, N.D5, N.E5, N._, N.C5, N._,
+      // Compás 4 (G - Clímax y remate festivo)
+      N.D5, N.E5, N.D5, N.B4, N.G4, N.B4, N.D5, N.G5, N.A5, N._, N.G5, N.E5, N.D5, N.E5, N.G5, N.A5
+    ],
+    // Patrón de batería de 16 pasos (K=Bombo, S=Caja/Clap, H=HiHat cerrado, O=HiHat abierto)
+    drums: ['K', 'H', 'O', 'H', 'KS', 'H', 'O', 'H', 'K', 'H', 'K', 'O', 'KS', 'H', 'O', 'H']
+  },
+  {
+    name: 'Sanhattan Turbo (Arcade Synthwave)',
+    bpm: 136,
+    leadWave: 'square',
+    bassWave: 'sawtooth',
+    chords: [
+      [N.E4, N.G4, N.B4],
+      [N.C4, N.E4, N.G4],
+      [N.D4, N.F4, N.A4],
+      [N.B3, N.D4, N.G4]
+    ],
+    bass: [
+      N.E2, N.E3, N.E2, N.E3, N.E2, N.E3, N.G2, N.B2, N.E2, N.E3, N.E2, N.E3, N.D2, N.D3, N.E2, N.G2,
+      N.C2, N.C3, N.C2, N.C3, N.C2, N.C3, N.E2, N.G2, N.C2, N.C3, N.C2, N.C3, N.B2, N.C3, N.E3, N.G3,
+      N.D2, N.D3, N.D2, N.D3, N.D2, N.D3, N.F2, N.A2, N.D2, N.D3, N.D2, N.D3, N.A2, N.D3, N.F3, N.A3,
+      N.G2, N.G3, N.G2, N.G3, N.A2, N.A3, N.B2, N.B3, N.E3, N._, N.D3, N.B2, N.A2, N.G2, N.B2, N.D3
+    ],
+    lead: [
+      N.B5, N.G5, N.E5, N.G5, N.B5, N._, N.A5, N.G5, N.E5, N.G5, N.A5, N.B5, N.G5, N.E5, N.D5, N.E5,
+      N.G5, N.E5, N.C5, N.E5, N.G5, N._, N.A5, N.G5, N.E5, N._, N.C5, N.E5, N.G5, N.A5, N.G5, N.E5,
+      N.A5, N.F5, N.D5, N.F5, N.A5, N._, N.B5, N.A5, N.F5, N.D5, N.F5, N.A5, N.C6, N.B5, N.A5, N.F5,
+      N.G5, N._, N.B5, N._, N.A5, N.G5, N.E5, N.D5, N.E5, N.G5, N.B5, N.A5, N.G5, N.E5, N.G5, N.A5
+    ],
+    drums: ['K', 'H', 'O', 'K', 'KS', 'H', 'O', 'H', 'K', 'K', 'O', 'H', 'KS', 'H', 'KS', 'O']
+  },
+  {
+    name: 'Cumbia Neón VIP (Fonda Electrónica)',
+    bpm: 118,
+    leadWave: 'triangle',
+    bassWave: 'triangle',
+    chords: [
+      [N.A3, N.C4, N.E4],
+      [N.E3, N.G3, N.B3],
+      [N.A3, N.C4, N.E4],
+      [N.E3, N.G3, N.B3]
+    ],
+    // Bajo Tumbado de Cumbia (en triadas rítmicas)
+    bass: [
+      N.A2, N._, N._, N.C3, N._, N._, N.E3, N._, N.A2, N._, N._, N.C3, N._, N._, N.E3, N._,
+      N.E2, N._, N._, N.G2, N._, N._, N.B2, N._, N.E2, N._, N._, N.G2, N._, N._, N.B2, N._,
+      N.A2, N._, N._, N.C3, N._, N._, N.E3, N._, N.F2, N._, N._, N.A2, N._, N._, N.C3, N._,
+      N.E2, N._, N._, N.G2, N._, N._, N.B2, N._, N.E2, N.G2, N.B2, N.E3, N.D3, N.C3, N.B2, N.G2
+    ],
+    // Melodía estilo Acordeón / Bronce Sintetizado Festivo
+    lead: [
+      N.A4, N.C5, N.E5, N.E5, N._, N.E5, N.D5, N.C5, N.E5, N.C5, N.A4, N._, N.A4, N.C5, N.E5, N._,
+      N.B4, N.D5, N.G5, N.G5, N._, N.G5, N.F5, N.E5, N.D5, N.B4, N.G4, N._, N.G4, N.B4, N.D5, N._,
+      N.C5, N.E5, N.A5, N.A5, N._, N.G5, N.F5, N.E5, N.F5, N.A5, N.C5, N._, N.C5, N.F5, N.A5, N._,
+      N.G5, N.E5, N.B4, N.E5, N.G5, N.E5, N.B4, N.D5, N.E5, N._, N.C5, N.B4, N.A4, N._, N.A5, N._
+    ],
+    drums: ['K', '_', 'H', 'O', 'K', '_', 'H', 'O', 'K', '_', 'H', 'O', 'KS', '_', 'H', 'O']
+  }
 ];
 
+function getNoiseBuffer() {
+  if (!audioCtx) return null;
+  if (noiseBuffer) return noiseBuffer;
+  const bufferSize = audioCtx.sampleRate * 0.25;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+  noiseBuffer = buffer;
+  return noiseBuffer;
+}
+
+// Bombo electrónico con golpe grave (Kick Drum)
+function playDrumKick(now) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(145, now);
+  osc.frequency.exponentialRampToValueAtTime(38, now + 0.11);
+  gain.gain.setValueAtTime(0.11, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.14);
+}
+
+// Caja / Clap con filtro pasa-banda y cuerpo (Snare)
+function playDrumSnare(now) {
+  const buf = getNoiseBuffer();
+  if (buf) {
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buf;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1400, now);
+    const nGain = audioCtx.createGain();
+    nGain.gain.setValueAtTime(0.045, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+    noise.connect(filter);
+    filter.connect(nGain);
+    nGain.connect(audioCtx.destination);
+    noise.start(now);
+    noise.stop(now + 0.12);
+  }
+  const body = audioCtx.createOscillator();
+  const bGain = audioCtx.createGain();
+  body.type = 'triangle';
+  body.frequency.setValueAtTime(195, now);
+  body.frequency.exponentialRampToValueAtTime(110, now + 0.07);
+  bGain.gain.setValueAtTime(0.04, now);
+  bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+  body.connect(bGain);
+  bGain.connect(audioCtx.destination);
+  body.start(now);
+  body.stop(now + 0.09);
+}
+
+// Platillo Hi-Hat (cerrado o abierto)
+function playDrumHat(now, isOpen = false) {
+  const buf = getNoiseBuffer();
+  if (!buf) return;
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buf;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'highpass';
+  filter.frequency.setValueAtTime(6800, now);
+  const gain = audioCtx.createGain();
+  const dur = isOpen ? 0.09 : 0.032;
+  gain.gain.setValueAtTime(isOpen ? 0.024 : 0.015, now);
+  gain.gain.exponentialRampToValueAtTime(0.0008, now + dur);
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  noise.start(now);
+  noise.stop(now + dur + 0.01);
+}
+
+// Bajo Funky con filtro resonante (Acid / Funk Bass)
+function playSynthBass(freq, now, stepSec, waveType = 'sawtooth') {
+  const osc = audioCtx.createOscillator();
+  const filter = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+
+  osc.type = waveType;
+  osc.frequency.setValueAtTime(freq, now);
+
+  filter.type = 'lowpass';
+  filter.Q.setValueAtTime(3.5, now);
+  filter.frequency.setValueAtTime(1350, now);
+  filter.frequency.exponentialRampToValueAtTime(210, now + stepSec * 0.9);
+
+  gain.gain.setValueAtTime(0.042, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + stepSec * 0.95);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + stepSec);
+}
+
+// Acordes rítmicos (Synth Stabs)
+function playChordStab(freqs, now, dur) {
+  freqs.forEach((f) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(f, now);
+    gain.gain.setValueAtTime(0.014, now);
+    gain.gain.exponentialRampToValueAtTime(0.0008, now + dur);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + dur + 0.01);
+  });
+}
+
+// Sintetizador Principal Doble (Lead Melody con armónico brillante)
+function playLeadSynth(freq, now, dur, waveType = 'sawtooth') {
+  const osc1 = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const filter = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+
+  osc1.type = waveType;
+  osc2.type = 'sine';
+  osc1.frequency.setValueAtTime(freq, now);
+  osc2.frequency.setValueAtTime(freq * 2, now); // Brillo de octava alta
+
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(2600, now);
+
+  gain.gain.setValueAtTime(0.028, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+  osc1.connect(filter);
+  osc2.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc1.start(now);
+  osc2.start(now);
+  osc1.stop(now + dur + 0.01);
+  osc2.stop(now + dur + 0.01);
+}
+
+function updateMusicPlayerUI() {
+  const song = AI_SONGS[currentAiSongIndex % AI_SONGS.length];
+  const trackEl = document.getElementById('ai-music-track-name');
+  const eqEl = document.getElementById('ai-music-eq');
+  const globalBtn = document.getElementById('btn-global-music-toggle');
+  const sidebarBtn = document.getElementById('btn-toggle-music');
+
+  if (trackEl && song) {
+    trackEl.textContent = song.name;
+  }
+  if (eqEl) {
+    eqEl.classList.toggle('playing', musicEnabled);
+  }
+  if (globalBtn) {
+    globalBtn.textContent = musicEnabled ? '🎵' : '🔕';
+  }
+  if (sidebarBtn) {
+    sidebarBtn.textContent = musicEnabled ? '🎵' : '🔕';
+  }
+}
+
 function startBackgroundMusic() {
-  if (!musicEnabled || !audioCtx || bgmIntervalId) return;
+  updateMusicPlayerUI();
+  if (!musicEnabled || !audioCtx) return;
   try {
     if (audioCtx.state === 'suspended') audioCtx.resume();
   } catch (_) {}
 
+  if (bgmIntervalId) {
+    clearInterval(bgmIntervalId);
+    bgmIntervalId = null;
+  }
+
+  const song = AI_SONGS[currentAiSongIndex % AI_SONGS.length];
+  const stepMs = Math.round((60 / song.bpm / 4) * 1000); // Duración de 1 semicorchea
+  const stepSec = stepMs / 1000;
+
   bgmIntervalId = setInterval(() => {
     if (!musicEnabled || !audioCtx || audioCtx.state !== 'running') return;
-    const step = BGM_MELODY[bgmNoteIndex % BGM_MELODY.length];
-    bgmNoteIndex += 1;
+    const activeSong = AI_SONGS[currentAiSongIndex % AI_SONGS.length];
+    const step = bgmStepIndex % 64;
+    const barIdx = Math.floor(step / 16);
+    const stepInBar = step % 16;
+    bgmStepIndex += 1;
 
     try {
-      // Nota melódica suave
-      if (step.f) {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(step.f, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.018, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0008, audioCtx.currentTime + 0.34);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.35);
+      const now = audioCtx.currentTime;
+
+      // 1. Batería y Percusión
+      const drumHit = activeSong.drums[stepInBar] || '_';
+      if (drumHit.includes('K')) playDrumKick(now);
+      if (drumHit.includes('S') || (step === 62 || step === 63)) playDrumSnare(now);
+      if (drumHit.includes('H')) playDrumHat(now, false);
+      if (drumHit.includes('O')) playDrumHat(now, true);
+
+      // 2. Línea de Bajo Funky / Synth
+      const bassNote = activeSong.bass[step];
+      if (bassNote) {
+        playSynthBass(bassNote, now, stepSec * 1.15, activeSong.bassWave);
       }
-      // Bajo suave de acompañamiento
-      if (step.b) {
-        const bass = audioCtx.createOscillator();
-        const bGain = audioCtx.createGain();
-        bass.type = 'triangle';
-        bass.frequency.setValueAtTime(step.b, audioCtx.currentTime);
-        bGain.gain.setValueAtTime(0.022, audioCtx.currentTime);
-        bGain.gain.exponentialRampToValueAtTime(0.0008, audioCtx.currentTime + 0.45);
-        bass.connect(bGain);
-        bGain.connect(audioCtx.destination);
-        bass.start();
-        bass.stop(audioCtx.currentTime + 0.46);
+
+      // 3. Acordes Rítmicos (en golpes 0, 3, 6, 10, 12 de cada compás)
+      if ([0, 3, 6, 10, 12].includes(stepInBar)) {
+        const chord = activeSong.chords[barIdx % activeSong.chords.length];
+        if (chord) {
+          playChordStab(chord, now, stepSec * 1.6);
+        }
+      }
+
+      // 4. Melodía Principal Sintetizada IA
+      const leadNote = activeSong.lead[step];
+      if (leadNote) {
+        playLeadSynth(leadNote, now, stepSec * 1.85, activeSong.leadWave);
       }
     } catch (_) {}
-  }, 380);
+  }, stepMs);
 }
 
 function stopBackgroundMusic() {
@@ -132,6 +401,16 @@ function stopBackgroundMusic() {
     clearInterval(bgmIntervalId);
     bgmIntervalId = null;
   }
+  updateMusicPlayerUI();
+}
+
+function nextAiSong() {
+  currentAiSongIndex = (currentAiSongIndex + 1) % AI_SONGS.length;
+  bgmStepIndex = 0;
+  musicEnabled = true;
+  startBackgroundMusic();
+  const song = AI_SONGS[currentAiSongIndex];
+  showToast(`🎶 Canción IA: ${song.name}`);
 }
 
 function playTone(freq = 440, duration = 0.12, type = 'sine') {
@@ -682,17 +961,22 @@ function bindUIEvents() {
   };
   document.addEventListener('click', unlockAudio);
 
-  // Música de Fondo
-  document.getElementById('btn-toggle-music').addEventListener('click', (e) => {
+  // Música de Fondo IA (controles en reproductor flotante y en barra lateral)
+  const toggleMusicHandler = () => {
     musicEnabled = !musicEnabled;
-    e.currentTarget.textContent = musicEnabled ? '🎵' : '🔕';
     if (musicEnabled) {
       startBackgroundMusic();
-      showToast('🎵 Música de fondo activada');
+      showToast(`🎵 Música IA activada: ${AI_SONGS[currentAiSongIndex].name}`);
     } else {
       stopBackgroundMusic();
-      showToast('🔕 Música de fondo en pausa');
+      showToast('🔕 Música IA en pausa');
     }
+  };
+
+  document.getElementById('btn-toggle-music')?.addEventListener('click', toggleMusicHandler);
+  document.getElementById('btn-global-music-toggle')?.addEventListener('click', toggleMusicHandler);
+  document.getElementById('btn-next-ai-song')?.addEventListener('click', () => {
+    nextAiSong();
   });
 
   // Sonido
@@ -1344,7 +1628,6 @@ function renderGame(state) {
   if (isGameParty) {
     if (gamePartyArenaEl) gamePartyArenaEl.classList.remove('hidden');
     if (mainGameLayoutEl) mainGameLayoutEl.classList.add('hidden');
-    stopBackgroundMusic();
 
     const me = state.players.find((p) => p.id === myPlayerId) || state.players[0];
     const targetUrl = `/gameparty/?autojoin=1&room=${encodeURIComponent(state.code)}&nick=${encodeURIComponent(me?.name || 'Jugador')}&avatar=${encodeURIComponent(me?.avatar?.icon || '😎')}&isHost=${isHost ? '1' : '0'}`;

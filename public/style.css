@@ -2270,6 +2270,85 @@ dialog.modern-dialog[open]:where(:not([data-closing]))::backdrop {
   white-space: nowrap;
 }
 
+/* Reproductor Flotante de Canción IA */
+.ai-music-player {
+  position: fixed;
+  bottom: 14px;
+  left: 14px;
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 999px;
+  padding: 0.38rem 0.65rem 0.38rem 0.85rem;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6), 0 0 18px rgba(56, 189, 248, 0.18);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.ai-music-player:hover {
+  border-color: #38bdf8;
+}
+
+.ai-music-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+  width: 18px;
+}
+
+.ai-music-eq span {
+  display: block;
+  width: 3px;
+  height: 4px;
+  background: linear-gradient(180deg, #38bdf8, #e11d48);
+  border-radius: 2px;
+}
+
+.ai-music-eq.playing span:nth-child(1) {
+  animation: eqBounce 0.48s infinite ease-in-out alternate;
+}
+.ai-music-eq.playing span:nth-child(2) {
+  animation: eqBounce 0.36s 0.12s infinite ease-in-out alternate;
+}
+.ai-music-eq.playing span:nth-child(3) {
+  animation: eqBounce 0.54s 0.2s infinite ease-in-out alternate;
+}
+.ai-music-eq.playing span:nth-child(4) {
+  animation: eqBounce 0.42s 0.06s infinite ease-in-out alternate;
+}
+
+@keyframes eqBounce {
+  0% { height: 4px; }
+  100% { height: 16px; }
+}
+
+.ai-music-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  margin-right: 0.2rem;
+}
+
+.ai-music-info small {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #38bdf8;
+}
+
+.ai-music-info strong {
+  font-size: 0.74rem;
+  color: #f8fafc;
+  max-width: 185px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Toasts */
 .toast-container {
   position: fixed;

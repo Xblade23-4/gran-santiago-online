@@ -13,6 +13,19 @@
   <!-- Notificaciones flotantes (Toasts) -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
+  <!-- Reproductor Flotante de Música creada con IA -->
+  <div id="ai-music-player" class="ai-music-player">
+    <div id="ai-music-eq" class="ai-music-eq playing" aria-hidden="true">
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <div class="ai-music-info">
+      <small>🤖 CANCIÓN IA EN VIVO</small>
+      <strong id="ai-music-track-name">Fiesta en Santiago (Electro-Party)</strong>
+    </div>
+    <button type="button" id="btn-global-music-toggle" class="btn-icon" title="Pausar/Reproducir Música IA">🎵</button>
+    <button type="button" id="btn-next-ai-song" class="btn-icon" title="Cambiar Canción IA">⏭️</button>
+  </div>
+
   <!-- Animación cinemática de Cambio de Turno -->
   <div id="turn-transition-overlay" class="turn-transition-overlay hidden" aria-hidden="true">
     <div class="turn-transition-card" id="turn-transition-card">
