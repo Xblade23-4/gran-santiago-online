@@ -781,6 +781,17 @@ function buildBoardDOM() {
 function switchScreen(screenId) {
   document.querySelectorAll('.screen').forEach((sc) => sc.classList.remove('active'));
   document.getElementById(screenId).classList.add('active');
+
+  if (screenId === 'screen-game') {
+    if (window.SantiagoMapAnimation) {
+      setTimeout(() => {
+        window.SantiagoMapAnimation.resize();
+        window.SantiagoMapAnimation.start();
+      }, 80);
+    }
+  } else if (window.SantiagoMapAnimation) {
+    window.SantiagoMapAnimation.stop();
+  }
 }
 
 function bindUIEvents() {
@@ -1433,15 +1444,18 @@ function startMyPenaltyCountdown(untilTimestamp) {
 
 // Posiciones geométricas dentro de un círculo para los 8 dibujos de cada carta de "¿Cuál es?"
 const CUAL_ES_SLOTS = [
-  { x: 50, y: 50, scale: 1.12 }, // Centro
-  { x: 50, y: 19, scale: 0.96 }, // Arriba
-  { x: 76, y: 31, scale: 1.02 }, // Arriba-Derecha
-  { x: 81, y: 59, scale: 0.94 }, // Abajo-Derecha
-  { x: 64, y: 81, scale: 1.04 }, // Inferior-Derecha
-  { x: 36, y: 81, scale: 0.95 }, // Inferior-Izquierda
-  { x: 19, y: 59, scale: 1.05 }, // Abajo-Izquierda
-  { x: 24, y: 31, scale: 0.98 }  // Arriba-Izquierda
+  { x: 50, y: 50 }, // Centro
+  { x: 50, y: 18 }, // Arriba
+  { x: 77, y: 30 }, // Arriba-Derecha
+  { x: 82, y: 59 }, // Abajo-Derecha
+  { x: 65, y: 82 }, // Inferior-Derecha
+  { x: 35, y: 82 }, // Inferior-Izquierda
+  { x: 18, y: 59 }, // Abajo-Izquierda
+  { x: 23, y: 30 }  // Arriba-Izquierda
 ];
+
+// Escalas variadas (desde pequeño 0.58x hasta gigante 1.44x) como en el juego físico real
+const CUAL_ES_SIZE_TIERS = [1.44, 0.64, 1.22, 0.74, 1.06, 0.58, 1.30, 0.86];
 
 function renderCualEsCircleCard(containerId, symbolIds, cardSeed = 0) {
   const container = document.getElementById(containerId);
@@ -1453,17 +1467,23 @@ function renderCualEsCircleCard(containerId, symbolIds, cardSeed = 0) {
     return;
   }
 
+  const cardHash = symbolIds.reduce((acc, val, i) => acc + val * (i + 3), cardSeed * 13);
+
   symbolIds.forEach((symId, idx) => {
     const sym = boardMeta.CUAL_ES_SYMBOLS[symId] || { id: symId, icon: '❓', name: '?' };
     const slot = CUAL_ES_SLOTS[idx % CUAL_ES_SLOTS.length];
-    const rot = (((symId * 37 + idx * 53 + cardSeed * 19) % 50) - 25);
+    // Cada icono en la carta recibe un tamaño distinto (gigante, grande, mediano, pequeño o mini) y rotación propia
+    const sizeTierIdx = (idx * 3 + cardHash + symId) % CUAL_ES_SIZE_TIERS.length;
+    const scale = CUAL_ES_SIZE_TIERS[sizeTierIdx];
+    const rot = ((symId * 47 + idx * 73 + cardHash * 29) % 360) - 180;
 
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'cuales-symbol-btn';
     btn.style.left = `${slot.x}%`;
     btn.style.top = `${slot.y}%`;
-    btn.style.transform = `translate(-50%, -50%) rotate(${rot}deg) scale(${slot.scale})`;
+    btn.style.setProperty('--sym-rot', `${rot}deg`);
+    btn.style.setProperty('--sym-scale', String(scale));
     btn.innerHTML = `<span class="sym-emoji">${sym.icon}</span>`;
 
     btn.addEventListener('click', () => {
@@ -1856,6 +1876,11 @@ function updateTurnActionControls(state) {
       const tile = boardMeta.BOARD_TILES[state.pendingBuyTileId];
       if (tile) {
         buyBox.classList.remove('hidden');
+        const buyGhibli = document.getElementById('buy-ghibli-preview');
+        if (buyGhibli && window.GhibliArt) {
+          buyGhibli.innerHTML = window.GhibliArt.getGhibliArtworkSVG(tile, 240, 126);
+          buyGhibli.classList.remove('hidden');
+        }
         const extraDetails = tile.type === 'property'
           ? `<div style="font-size:0.75rem; color:#cbd5e1; margin-top:4px;">💸 Arriendo base: <strong>${formatCLP(tile.rents[0])}</strong> · 🏗️ Mejora Casa/Hotel: <strong>${formatCLP(tile.houseCost)}</strong> <button type="button" onclick="openPropertyModal(${tile.id})" class="btn btn-xs btn-secondary" style="margin-left:4px; padding:1px 6px;">Ver Carta</button></div>`
           : (tile.type === 'station'
@@ -2240,12 +2265,28 @@ function openPropertyModal(tileId) {
   comunaEl.textContent = tile.comuna || groupInfo?.name || 'CASILLA ESPECIAL';
   titleEl.textContent = `${tile.icon ? tile.icon + ' ' : ''}${tile.name}`;
 
+  // Ilustración Studio Ghibli del lugar en la tarjeta
+  const ghibliEl = document.getElementById('prop-dialog-ghibli-artwork');
+  if (ghibliEl) {
+    if (window.GhibliArt) {
+      ghibliEl.innerHTML = window.GhibliArt.getGhibliArtworkSVG(tile, 340, 180);
+      ghibliEl.classList.remove('hidden');
+    } else {
+      ghibliEl.classList.add('hidden');
+    }
+  }
+
   const emblemEl = document.getElementById('prop-dialog-emblem');
   if (emblemEl) {
-    const bigIcon = tile.icon || (tile.type === 'property' ? '🏘️' : '📍');
-    emblemEl.textContent = bigIcon;
-    emblemEl.style.borderColor = headerColor;
-    emblemEl.classList.remove('hidden');
+    // Si hay arte Ghibli, ocultar el círculo con emoji para que destaque la postal ilustrada
+    if (window.GhibliArt) {
+      emblemEl.classList.add('hidden');
+    } else {
+      const bigIcon = tile.icon || (tile.type === 'property' ? '🏘️' : '📍');
+      emblemEl.textContent = bigIcon;
+      emblemEl.style.borderColor = headerColor;
+      emblemEl.classList.remove('hidden');
+    }
   }
 
   priceEl.textContent = tile.price ? formatCLP(tile.price) : '—';

@@ -405,6 +405,11 @@
         <div id="board-grid" class="board-grid">
           <!-- El centro del tablero (filas 2..10, columnas 2..10) -->
           <div class="board-center">
+            <!-- Animación de mapa de Santiago con buses Transantiago recorriendo avenidas -->
+            <div id="santiago-animated-map" class="santiago-animated-map" aria-hidden="true">
+              <canvas id="santiago-map-canvas"></canvas>
+            </div>
+
             <div class="center-header">
               <div class="center-logo">🚇 GRAN SANTIAGO</div>
               <div class="pot-banner" title="Pozo acumulado por Impuestos SII y TAG. ¡Cae en Parque O'Higgins para ganarlo!">
@@ -431,6 +436,7 @@
                   🚓 Pagar Fianza ($50.000)
                 </button>
                 <div id="buy-decision-box" class="buy-decision-box hidden">
+                  <div id="buy-ghibli-preview" class="buy-ghibli-preview hidden"></div>
                   <div id="buy-prompt-text" class="buy-prompt-text">¿Comprar propiedad?</div>
                   <div class="buy-buttons">
                     <button id="btn-buy-prop" class="btn btn-success">✅ Comprar Escritura</button>
@@ -483,6 +489,7 @@
         <h3 id="prop-dialog-title">Nombre de la Propiedad</h3>
       </div>
       <div class="prop-dialog-body">
+        <div id="prop-dialog-ghibli-artwork" class="prop-dialog-ghibli-artwork"></div>
         <div id="prop-dialog-emblem" class="prop-dialog-emblem hidden"></div>
         <div class="prop-price-tag">
           <span>Valor Comercial Escritura:</span>
@@ -582,6 +589,8 @@
   </dialog>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/ghibliArt.js"></script>
+  <script src="/santiagoMapAnimation.js"></script>
   <script src="/client.js"></script>
 </body>
 </html>
