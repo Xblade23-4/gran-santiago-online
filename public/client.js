@@ -1117,10 +1117,29 @@ function bindUIEvents() {
       if (res && !res.ok) showToast(res.error);
       else {
         playSoundEffect('buy');
+        playTone(587.33, 0.15, 'triangle');
         openPropertyModal(inspectedTileId);
       }
     });
   });
+
+  const buildHereBtn = document.getElementById('btn-build-here');
+  if (buildHereBtn) {
+    buildHereBtn.addEventListener('click', () => {
+      if (!currentRoomState) return;
+      const me = currentRoomState.players?.find((p) => p.id === myPlayerId);
+      if (!me) return;
+      socket.emit('build_house', { tileId: me.position }, (res) => {
+        if (res && !res.ok) {
+          showToast(res.error);
+        } else {
+          playSoundEffect('buy');
+          playTone(587.33, 0.15, 'triangle');
+          showToast('🏗️ ¡Mejora comprada con éxito!');
+        }
+      });
+    });
+  }
 
   document.getElementById('btn-sell-house').addEventListener('click', () => {
     if (inspectedTileId === null) return;
@@ -2035,11 +2054,13 @@ function updateTurnActionControls(state) {
   const rollBtn = document.getElementById('btn-roll-dice');
   const bailBtn = document.getElementById('btn-pay-bail');
   const buyBox = document.getElementById('buy-decision-box');
+  const buildHereBtn = document.getElementById('btn-build-here');
   const endBtn = document.getElementById('btn-end-turn');
 
   rollBtn.classList.add('hidden');
   bailBtn.classList.add('hidden');
   buyBox.classList.add('hidden');
+  if (buildHereBtn) buildHereBtn.classList.add('hidden');
   endBtn.classList.add('hidden');
 
   // Esperar a que termine la animación de caminar o se confirme la tarjeta "?"
@@ -2075,6 +2096,39 @@ function updateTurnActionControls(state) {
       endBtn.textContent = state.doublesCount > 0 && !currentPlayer.inJail
         ? '🎲 Tirar de Nuevo (Dobles)'
         : '⏭️ Terminar Turno';
+
+      // Verificar si puede comprar 1 mejora en la casilla donde aterrizó (si tiene todas las tarjetas del barrio)
+      const currentTile = boardMeta.BOARD_TILES[currentPlayer.position];
+      const currentProp = state.properties?.[currentPlayer.position];
+      const hasBuiltThisTurn = (state.builtHousesCountThisTurn || 0) >= 1;
+
+      if (
+        currentTile &&
+        currentTile.type === 'property' &&
+        currentProp &&
+        currentProp.ownerId === currentPlayer.id &&
+        !currentProp.mortgaged &&
+        currentProp.houses < 5 &&
+        !hasBuiltThisTurn
+      ) {
+        const groupTiles = boardMeta.BOARD_TILES.filter((t) => t.group === currentTile.group);
+        const ownsAllCards =
+          groupTiles.length > 0 &&
+          groupTiles.every(
+            (t) => state.properties?.[t.id]?.ownerId === currentPlayer.id && !state.properties?.[t.id]?.mortgaged
+          );
+
+        if (ownsAllCards && buildHereBtn) {
+          const nextLabel = currentProp.houses === 4 ? '🏨 Comprar 1 Hotel' : '🏠 Comprar 1 Casa';
+          const canAfford = currentPlayer.money >= currentTile.houseCost;
+          buildHereBtn.textContent = `🏗️ ${nextLabel} en ${currentTile.name} (${formatCLP(currentTile.houseCost)})`;
+          buildHereBtn.disabled = !canAfford;
+          buildHereBtn.title = canAfford
+            ? 'Comprar 1 mejora por caer en tu barrio completo'
+            : 'Fondos insuficientes';
+          buildHereBtn.classList.remove('hidden');
+        }
+      }
     }
   }
 }
@@ -2591,10 +2645,43 @@ function openPropertyModal(tileId) {
     actionsBox.classList.remove('hidden');
     const buildBtn = document.getElementById('btn-build-house');
     const sellBtn = document.getElementById('btn-sell-house');
+    const myPlayer = currentRoomState.players.find((p) => p.id === myPlayerId);
+    const isCurrentTurn = currentRoomState.players[currentRoomState.turnIndex]?.id === myPlayerId;
+    const isAtThisTile = myPlayer && myPlayer.position === tile.id;
+    const hasBuiltThisTurn = (currentRoomState.builtHousesCountThisTurn || 0) >= 1;
+
+    // Verificar si tiene todas las tarjetas del barrio
+    const groupTiles = tile.group ? boardMeta.BOARD_TILES.filter((t) => t.group === tile.group) : [];
+    const ownsAllCards =
+      groupTiles.length > 0 &&
+      groupTiles.every(
+        (t) => currentRoomState.properties?.[t.id]?.ownerId === myPlayerId && !currentRoomState.properties?.[t.id]?.mortgaged
+      );
+
     if (tile.type === 'property') {
       buildBtn.style.display = propState.houses < 5 ? 'inline-flex' : 'none';
       const nextUpgradeLabel = propState.houses === 4 ? '🏨 Construir Hotel' : '🏠 Construir Casa';
       buildBtn.textContent = `${nextUpgradeLabel} (${formatCLP(tile.houseCost)})`;
+
+      if (!ownsAllCards) {
+        buildBtn.disabled = true;
+        buildBtn.title = 'Debes tener todas las tarjetas del barrio para edificar mejoras';
+      } else if (!isAtThisTile) {
+        buildBtn.disabled = true;
+        buildBtn.title = 'Solo puedes comprar 1 mejora al caer físicamente en esta casilla';
+      } else if (!isCurrentTurn) {
+        buildBtn.disabled = true;
+        buildBtn.title = 'Solo puedes comprar mejoras durante tu turno';
+      } else if (hasBuiltThisTurn) {
+        buildBtn.disabled = true;
+        buildBtn.title = 'Ya compraste 1 mejora en esta pasada (máx. 1 por caída)';
+      } else if (myPlayer && myPlayer.money < tile.houseCost) {
+        buildBtn.disabled = true;
+        buildBtn.title = `Fondos insuficientes (requiere ${formatCLP(tile.houseCost)})`;
+      } else {
+        buildBtn.disabled = false;
+        buildBtn.title = 'Comprar 1 mejora por caer en tu barrio completo';
+      }
     } else {
       buildBtn.style.display = 'none';
     }

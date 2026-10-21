@@ -137,6 +137,7 @@ function createRoom(hostPlayer, customCode, settings = {}) {
     pendingBuyTileId: null,
     lastDice: [1, 1],
     doublesCount: 0,
+    builtHousesCountThisTurn: 0,
     pot: 100000, // Pozo inicial Parque O'Higgins
     properties: createInitialProperties(),
     trades: [], // Ofertas de trueque activas
@@ -323,6 +324,7 @@ function advanceTurn(room) {
     room.cardConfirmTimer = null;
   }
   room.doublesCount = 0;
+  room.builtHousesCountThisTurn = 0;
 
   let nextIdx = room.turnIndex;
   for (let i = 0; i < room.players.length; i++) {
@@ -726,13 +728,15 @@ function scheduleBotPostLanding(room, botPlayer, delayMs = 2600) {
       broadcastRoomState(room);
     }
 
-    // Intentar edificar casas si tiene un grupo completo y buena liquidez
-    for (const [tileIdStr, prop] of Object.entries(room.properties)) {
-      const tileId = Number(tileIdStr);
-      const tile = BOARD_TILES[tileId];
+    // Intentar edificar mejora: solo 1 casa al caer en su propia casilla si tiene el barrio completo y liquidez
+    if ((room.builtHousesCountThisTurn || 0) < 1) {
+      const landedTileId = botPlayer.position;
+      const tile = BOARD_TILES[landedTileId];
+      const prop = room.properties[landedTileId];
       if (
         tile &&
         tile.type === 'property' &&
+        prop &&
         prop.ownerId === botPlayer.id &&
         !prop.mortgaged &&
         prop.houses < 5 &&
@@ -741,8 +745,9 @@ function scheduleBotPostLanding(room, botPlayer, delayMs = 2600) {
       ) {
         botPlayer.money -= tile.houseCost;
         prop.houses += 1;
-        const label = prop.houses === 5 ? 'una Torre Costanera (Hotel)' : `Casa #${prop.houses}`;
-        addLog(room, `🏗️ ${botPlayer.name} construyó ${label} en ${tile.name} por ${formatCLP(tile.houseCost)}.`, 'buy');
+        room.builtHousesCountThisTurn = 1;
+        const label = prop.houses === 5 ? 'una Torre Costanera (Hotel) 🏙️' : `Casa #${prop.houses} 🏠`;
+        addLog(room, `🏗️ ${botPlayer.name} cayó en su propiedad y compró 1 mejora (${label}) en ${tile.name} por ${formatCLP(tile.houseCost)}.`, 'buy');
       }
     }
 
@@ -838,6 +843,7 @@ function serializeRoom(room) {
     pendingCard: room.pendingCard || null,
     lastDice: room.lastDice,
     doublesCount: room.doublesCount,
+    builtHousesCountThisTurn: room.builtHousesCountThisTurn || 0,
     pot: room.pot,
     properties: room.properties,
     trades: room.trades,
@@ -1404,7 +1410,21 @@ io.on('connection', (socket) => {
 
     const tile = BOARD_TILES[tileId];
     const prop = room.properties[tileId];
-    if (!tile || tile.type !== 'property' || !prop || prop.ownerId !== current.id) return;
+    if (!tile || tile.type !== 'property' || !prop || prop.ownerId !== current.id) {
+      if (callback) callback({ ok: false, error: 'Propiedad inválida o no te pertenece.' });
+      return;
+    }
+
+    // Regla chilena tradicional: solo se puede comprar 1 propiedad al caer en la casilla del barrio con todas las tarjetas
+    if (current.position !== Number(tileId)) {
+      if (callback) callback({ ok: false, error: `Debes caer físicamente en la casilla de ${tile.name} para poder comprar una mejora.` });
+      return;
+    }
+
+    if ((room.builtHousesCountThisTurn || 0) >= 1) {
+      if (callback) callback({ ok: false, error: 'Solo se puede comprar 1 mejora por cada vez que caigas en la casilla.' });
+      return;
+    }
 
     if (prop.mortgaged) {
       if (callback) callback({ ok: false, error: 'No puedes construir en una propiedad hipotecada.' });
@@ -1412,7 +1432,7 @@ io.on('connection', (socket) => {
     }
 
     if (!ownsFullGroup(room, current.id, tile.group)) {
-      if (callback) callback({ ok: false, error: 'Debes ser dueño de todas las propiedades de este color para construir.' });
+      if (callback) callback({ ok: false, error: 'Debes tener todas las tarjetas del barrio (grupo completo) para construir.' });
       return;
     }
 
@@ -1428,8 +1448,9 @@ io.on('connection', (socket) => {
 
     current.money -= tile.houseCost;
     prop.houses += 1;
+    room.builtHousesCountThisTurn = (room.builtHousesCountThisTurn || 0) + 1;
     const buildName = prop.houses === 5 ? 'una Torre (Hotel) 🏙️' : `Casa #${prop.houses} 🏠`;
-    addLog(room, `🏗️ ${current.name} construyó ${buildName} en ${tile.name} por ${formatCLP(tile.houseCost)}.`, 'buy');
+    addLog(room, `🏗️ ${current.name} compró 1 mejora (${buildName}) en ${tile.name} por ${formatCLP(tile.houseCost)}.`, 'buy');
     broadcastRoomState(room);
     if (callback) callback({ ok: true });
   });
@@ -1562,6 +1583,7 @@ io.on('connection', (socket) => {
     // Si sacó dobles y no está en la comisaría, vuelve a tirar
     if (room.doublesCount > 0 && !current.inJail && !current.bankrupt) {
       room.turnPhase = 'ROLL';
+      room.builtHousesCountThisTurn = 0;
       addLog(room, `🎲 ¡Como sacó dobles, ${current.name} tiene turno extra para lanzar!`, 'turn');
       broadcastRoomState(room);
       return;

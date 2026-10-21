@@ -78,10 +78,28 @@ async function runTests() {
 
     // 6. Darle también Gran Avenida (casilla 3) a p1 para completar el grupo café y probar construcción de casa
     room.properties[3].ownerId = 'p1';
+
+    // 6.1 Intentar construir en casilla 3 estando en casilla 1 (debe fallar por no estar en la casilla)
+    const buildDifferentTileRes = await new Promise((r) => host.emit('build_house', { tileId: 3 }, r));
+    assert.strictEqual(buildDifferentTileRes.ok, false, 'No debe permitir construir en una casilla diferente a la actual');
+    assert.ok(
+      buildDifferentTileRes.error.includes('caer'),
+      'El error debe indicar que debe caer en la casilla para comprar la mejora'
+    );
+
+    // 6.2 Construir 1 casa en la casilla 1 donde está posicionado (debe permitirlo)
     const buildRes = await new Promise((r) => host.emit('build_house', { tileId: 1 }, r));
-    assert.strictEqual(buildRes.ok, true, 'Debe permitir construir casa al tener grupo completo');
+    assert.strictEqual(buildRes.ok, true, 'Debe permitir construir 1 casa al tener barrio completo y caer en la casilla');
     assert.strictEqual(room.properties[1].houses, 1, 'Av. Pajaritos debe tener 1 casa');
-    console.log('✅ Construcción de casas y monopolio por sector verificados.');
+
+    // 6.3 Intentar construir una 2da casa en el mismo turno/caída (debe ser rechazado por la regla de máx 1 por caída)
+    const buildSecondRes = await new Promise((r) => host.emit('build_house', { tileId: 1 }, r));
+    assert.strictEqual(buildSecondRes.ok, false, 'No debe permitir comprar más de 1 mejora en la misma caída');
+    assert.ok(
+      buildSecondRes.error.includes('Solo se puede comprar 1'),
+      'El error debe indicar la regla de máximo 1 mejora por caída'
+    );
+    console.log('✅ Regla de compra de mejora verificada: solo 1 por caída al aterrizar en casilla con barrio completo.');
 
     // 6b. Verificar que al caer en propiedad ajena se emite payment_popup con mensaje de 5s
     const popupPromise = new Promise((resolve) => {
