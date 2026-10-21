@@ -84,98 +84,36 @@ const N = {
   C6: 1046.50
 };
 
-// 3 Canciones completas compuestas por IA (64 pasos de semicorchea = Estrofa + Pre-Coro + Coro Explosivo)
-const AI_SONGS = [
-  {
-    name: 'Fiesta en Santiago (Electro-Party)',
-    bpm: 126,
-    leadWave: 'sawtooth',
-    bassWave: 'sawtooth',
-    // Progresión por cada compás de 16 pasos: Am -> F -> C -> G
-    chords: [
-      [N.A3, N.C4, N.E4],
-      [N.F3, N.A3, N.C4],
-      [N.C4, N.E4, N.G4],
-      [N.G3, N.B3, N.D4]
-    ],
-    // Bajo Funky Octavado (64 pasos)
-    bass: [
-      // Compás 1 (Am)
-      N.A2, N._, N.A3, N.A2, N._, N.A2, N.G2, N.A2, N.A2, N._, N.A3, N.E2, N._, N.G2, N.A2, N.E3,
-      // Compás 2 (F)
-      N.F2, N._, N.F3, N.F2, N._, N.F2, N.E2, N.F2, N.F2, N._, N.F3, N.C3, N._, N.C3, N.F2, N.G2,
-      // Compás 3 (C)
-      N.C2, N._, N.C3, N.C2, N._, N.C2, N.B2, N.C3, N.C2, N._, N.C3, N.G2, N._, N.A2, N.C3, N.E3,
-      // Compás 4 (G)
-      N.G2, N._, N.G3, N.G2, N._, N.G2, N.A2, N.B2, N.D3, N._, N.B2, N.G2, N.A2, N.B2, N.D3, N.E3
-    ],
-    // Melodía Principal Sintetizada IA (Estrofa rítmica + Coro pegajoso en octava alta)
-    lead: [
-      // Compás 1 (Am - Hook inicial)
-      N.E5, N._, N.C5, N.A4, N._, N.C5, N.E5, N._, N.G5, N.E5, N._, N.D5, N.C5, N.D5, N.E5, N._,
-      // Compás 2 (F - Respuesta melódica)
-      N.F5, N._, N.C5, N.A4, N._, N.C5, N.F5, N._, N.E5, N.D5, N._, N.C5, N.A4, N.C5, N.D5, N._,
-      // Compás 3 (C - Subida de energía / Coro)
-      N.G5, N._, N.E5, N.C5, N.E5, N.G5, N.A5, N._, N.G5, N.E5, N.C5, N.D5, N.E5, N._, N.C5, N._,
-      // Compás 4 (G - Clímax y remate festivo)
-      N.D5, N.E5, N.D5, N.B4, N.G4, N.B4, N.D5, N.G5, N.A5, N._, N.G5, N.E5, N.D5, N.E5, N.G5, N.A5
-    ],
-    // Patrón de batería de 16 pasos (K=Bombo, S=Caja/Clap, H=HiHat cerrado, O=HiHat abierto)
-    drums: ['K', 'H', 'O', 'H', 'KS', 'H', 'O', 'H', 'K', 'H', 'K', 'O', 'KS', 'H', 'O', 'H']
-  },
-  {
-    name: 'Sanhattan Turbo (Arcade Synthwave)',
-    bpm: 136,
-    leadWave: 'square',
-    bassWave: 'sawtooth',
-    chords: [
-      [N.E4, N.G4, N.B4],
-      [N.C4, N.E4, N.G4],
-      [N.D4, N.F4, N.A4],
-      [N.B3, N.D4, N.G4]
-    ],
-    bass: [
-      N.E2, N.E3, N.E2, N.E3, N.E2, N.E3, N.G2, N.B2, N.E2, N.E3, N.E2, N.E3, N.D2, N.D3, N.E2, N.G2,
-      N.C2, N.C3, N.C2, N.C3, N.C2, N.C3, N.E2, N.G2, N.C2, N.C3, N.C2, N.C3, N.B2, N.C3, N.E3, N.G3,
-      N.D2, N.D3, N.D2, N.D3, N.D2, N.D3, N.F2, N.A2, N.D2, N.D3, N.D2, N.D3, N.A2, N.D3, N.F3, N.A3,
-      N.G2, N.G3, N.G2, N.G3, N.A2, N.A3, N.B2, N.B3, N.E3, N._, N.D3, N.B2, N.A2, N.G2, N.B2, N.D3
-    ],
-    lead: [
-      N.B5, N.G5, N.E5, N.G5, N.B5, N._, N.A5, N.G5, N.E5, N.G5, N.A5, N.B5, N.G5, N.E5, N.D5, N.E5,
-      N.G5, N.E5, N.C5, N.E5, N.G5, N._, N.A5, N.G5, N.E5, N._, N.C5, N.E5, N.G5, N.A5, N.G5, N.E5,
-      N.A5, N.F5, N.D5, N.F5, N.A5, N._, N.B5, N.A5, N.F5, N.D5, N.F5, N.A5, N.C6, N.B5, N.A5, N.F5,
-      N.G5, N._, N.B5, N._, N.A5, N.G5, N.E5, N.D5, N.E5, N.G5, N.B5, N.A5, N.G5, N.E5, N.G5, N.A5
-    ],
-    drums: ['K', 'H', 'O', 'K', 'KS', 'H', 'O', 'H', 'K', 'K', 'O', 'H', 'KS', 'H', 'KS', 'O']
-  },
-  {
-    name: 'Cumbia Neón VIP (Fonda Electrónica)',
-    bpm: 118,
-    leadWave: 'triangle',
-    bassWave: 'triangle',
-    chords: [
-      [N.A3, N.C4, N.E4],
-      [N.E3, N.G3, N.B3],
-      [N.A3, N.C4, N.E4],
-      [N.E3, N.G3, N.B3]
-    ],
-    // Bajo Tumbado de Cumbia (en triadas rítmicas)
-    bass: [
-      N.A2, N._, N._, N.C3, N._, N._, N.E3, N._, N.A2, N._, N._, N.C3, N._, N._, N.E3, N._,
-      N.E2, N._, N._, N.G2, N._, N._, N.B2, N._, N.E2, N._, N._, N.G2, N._, N._, N.B2, N._,
-      N.A2, N._, N._, N.C3, N._, N._, N.E3, N._, N.F2, N._, N._, N.A2, N._, N._, N.C3, N._,
-      N.E2, N._, N._, N.G2, N._, N._, N.B2, N._, N.E2, N.G2, N.B2, N.E3, N.D3, N.C3, N.B2, N.G2
-    ],
-    // Melodía estilo Acordeón / Bronce Sintetizado Festivo
-    lead: [
-      N.A4, N.C5, N.E5, N.E5, N._, N.E5, N.D5, N.C5, N.E5, N.C5, N.A4, N._, N.A4, N.C5, N.E5, N._,
-      N.B4, N.D5, N.G5, N.G5, N._, N.G5, N.F5, N.E5, N.D5, N.B4, N.G4, N._, N.G4, N.B4, N.D5, N._,
-      N.C5, N.E5, N.A5, N.A5, N._, N.G5, N.F5, N.E5, N.F5, N.A5, N.C5, N._, N.C5, N.F5, N.A5, N._,
-      N.G5, N.E5, N.B4, N.E5, N.G5, N.E5, N.B4, N.D5, N.E5, N._, N.C5, N.B4, N.A4, N._, N.A5, N._
-    ],
-    drums: ['K', '_', 'H', 'O', 'K', '_', 'H', 'O', 'K', '_', 'H', 'O', 'KS', '_', 'H', 'O']
-  }
-];
+// 20 Canciones completas compuestas por IA desde el Jukebox
+const AI_SONGS = (typeof window !== 'undefined' && window.MusicJukebox && Array.isArray(window.MusicJukebox.SONGS) && window.MusicJukebox.SONGS.length > 0)
+  ? window.MusicJukebox.SONGS
+  : [
+      {
+        name: 'Fiesta en Santiago (Electro-Party)',
+        bpm: 126,
+        leadWave: 'sawtooth',
+        bassWave: 'sawtooth',
+        chords: [
+          [N.A3, N.C4, N.E4],
+          [N.F3, N.A3, N.C4],
+          [N.C4, N.E4, N.G4],
+          [N.G3, N.B3, N.D4]
+        ],
+        bass: [
+          N.A2, N._, N.A3, N.A2, N._, N.A2, N.G2, N.A2, N.A2, N._, N.A3, N.E2, N._, N.G2, N.A2, N.E3,
+          N.F2, N._, N.F3, N.F2, N._, N.F2, N.E2, N.F2, N.F2, N._, N.F3, N.C3, N._, N.C3, N.F2, N.G2,
+          N.C2, N._, N.C3, N.C2, N._, N.C2, N.B2, N.C3, N.C2, N._, N.C3, N.G2, N._, N.A2, N.C3, N.E3,
+          N.G2, N._, N.G3, N.G2, N._, N.G2, N.A2, N.B2, N.D3, N._, N.B2, N.G2, N.A2, N.B2, N.D3, N.E3
+        ],
+        lead: [
+          N.E5, N._, N.C5, N.A4, N._, N.C5, N.E5, N._, N.G5, N.E5, N._, N.D5, N.C5, N.D5, N.E5, N._,
+          N.F5, N._, N.C5, N.A4, N._, N.C5, N.F5, N._, N.E5, N.D5, N._, N.C5, N.A4, N.C5, N.D5, N._,
+          N.G5, N._, N.E5, N.C5, N.E5, N.G5, N.A5, N._, N.G5, N.E5, N.C5, N.D5, N.E5, N._, N.C5, N._,
+          N.D5, N.E5, N.D5, N.B4, N.G4, N.B4, N.D5, N.G5, N.A5, N._, N.G5, N.E5, N.D5, N.E5, N.G5, N.A5
+        ],
+        drums: ['K', 'H', 'O', 'H', 'KS', 'H', 'O', 'H', 'K', 'H', 'K', 'O', 'KS', 'H', 'O', 'H']
+      }
+    ];
 
 function getNoiseBuffer() {
   if (!audioCtx) return null;
@@ -411,6 +349,15 @@ function stopBackgroundMusic() {
   updateMusicPlayerUI();
 }
 
+function prevAiSong() {
+  currentAiSongIndex = (currentAiSongIndex - 1 + AI_SONGS.length) % AI_SONGS.length;
+  bgmStepIndex = 0;
+  musicEnabled = true;
+  startBackgroundMusic();
+  const song = AI_SONGS[currentAiSongIndex];
+  showToast(`🎶 Canción IA: ${song.name}`);
+}
+
 function nextAiSong() {
   currentAiSongIndex = (currentAiSongIndex + 1) % AI_SONGS.length;
   bgmStepIndex = 0;
@@ -418,6 +365,63 @@ function nextAiSong() {
   startBackgroundMusic();
   const song = AI_SONGS[currentAiSongIndex];
   showToast(`🎶 Canción IA: ${song.name}`);
+}
+
+function playCashierSound() {
+  if (!soundEnabled || !audioCtx) return;
+  try {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const now = audioCtx.currentTime;
+
+    // 1. Sonido mecánico de cajón abriéndose
+    const mech = audioCtx.createOscillator();
+    const mGain = audioCtx.createGain();
+    mech.type = 'triangle';
+    mech.frequency.setValueAtTime(320, now);
+    mech.frequency.exponentialRampToValueAtTime(140, now + 0.08);
+    mGain.gain.setValueAtTime(0.12, now);
+    mGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    mech.connect(mGain);
+    mGain.connect(audioCtx.destination);
+    mech.start(now);
+    mech.stop(now + 0.08);
+
+    // 2. Primer repique de campana "Ka-" (E6 ~1318.5 Hz)
+    const bell1 = audioCtx.createOscillator();
+    const gBell1 = audioCtx.createGain();
+    bell1.type = 'sine';
+    bell1.frequency.setValueAtTime(1318.51, now + 0.04);
+    gBell1.gain.setValueAtTime(0.2, now + 0.04);
+    gBell1.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+    bell1.connect(gBell1);
+    gBell1.connect(audioCtx.destination);
+    bell1.start(now + 0.04);
+    bell1.stop(now + 0.38);
+
+    // 3. Segundo repique brillante de campana "-CHING!" (B6 ~1975.5 Hz)
+    const bell2 = audioCtx.createOscillator();
+    const gBell2 = audioCtx.createGain();
+    bell2.type = 'sine';
+    bell2.frequency.setValueAtTime(1975.53, now + 0.12);
+    gBell2.gain.setValueAtTime(0.26, now + 0.12);
+    gBell2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    bell2.connect(gBell2);
+    gBell2.connect(audioCtx.destination);
+    bell2.start(now + 0.12);
+    bell2.stop(now + 0.7);
+
+    // Armónico metálico agudo
+    const harm = audioCtx.createOscillator();
+    const gHarm = audioCtx.createGain();
+    harm.type = 'triangle';
+    harm.frequency.setValueAtTime(3951, now + 0.12);
+    gHarm.gain.setValueAtTime(0.07, now + 0.12);
+    gHarm.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    harm.connect(gHarm);
+    gHarm.connect(audioCtx.destination);
+    harm.start(now + 0.12);
+    harm.stop(now + 0.45);
+  } catch (_) {}
 }
 
 function playTone(freq = 440, duration = 0.12, type = 'sine') {
@@ -441,10 +445,8 @@ function playSoundEffect(kind) {
   if (kind === 'dice') {
     playTone(320, 0.08, 'triangle');
     setTimeout(() => playTone(480, 0.1, 'triangle'), 90);
-  } else if (kind === 'buy') {
-    playTone(523.25, 0.1, 'sine');
-    setTimeout(() => playTone(659.25, 0.12, 'sine'), 100);
-    setTimeout(() => playTone(783.99, 0.18, 'sine'), 210);
+  } else if (kind === 'buy' || kind === 'cashier') {
+    playCashierSound();
   } else if (kind === 'turn') {
     playTone(587.33, 0.12, 'sine');
     setTimeout(() => playTone(783.99, 0.16, 'sine'), 110);
@@ -789,53 +791,8 @@ function updateSocialCardUI() {
   }
 }
 
-function openSocialModal(provider) {
-  activeSocialModalTarget = provider;
+function openSocialModal() {
   const dialog = document.getElementById('social-auth-dialog');
-  const title = document.getElementById('social-dialog-title');
-  const desc = document.getElementById('social-dialog-desc');
-  const demoTitle = document.getElementById('sob-demo-title');
-  const demoSub = document.getElementById('sob-demo-sub');
-  const demoIcon = document.getElementById('sob-demo-icon');
-
-  const configs = {
-    google: {
-      title: '🔴 Conectar con Google',
-      desc: 'Importa tu foto de perfil de Google para usarla como tu ficha en el tablero:',
-      demoTitle: 'Usar perfil demo verificado de Google',
-      demoSub: 'Simula inicio de sesión oficial con foto real de Google',
-      icon: '🔴'
-    },
-    facebook: {
-      title: '🔵 Conectar con Facebook',
-      desc: 'Importa tu foto de perfil de Facebook para usarla como tu ficha en el tablero:',
-      demoTitle: 'Usar perfil demo verificado de Facebook',
-      demoSub: 'Simula inicio de sesión oficial con foto real de Facebook',
-      icon: '🔵'
-    },
-    instagram: {
-      title: '📸 Conectar con Instagram',
-      desc: 'Importa tu foto de perfil de Instagram para usarla como tu ficha en el tablero:',
-      demoTitle: 'Usar perfil demo verificado de Instagram',
-      demoSub: 'Simula conexión con cuenta de Instagram y foto de perfil',
-      icon: '📸'
-    },
-    upload: {
-      title: '📁 Cargar Foto de Perfil',
-      desc: 'Sube una imagen o pega una URL directa para usarla como ficha:',
-      demoTitle: 'Usar foto de avatar destacada',
-      demoSub: 'Foto de alta resolución para el juego',
-      icon: '⭐'
-    }
-  };
-
-  const cfg = configs[provider] || configs.google;
-  if (title) title.textContent = cfg.title;
-  if (desc) desc.textContent = cfg.desc;
-  if (demoTitle) demoTitle.textContent = cfg.demoTitle;
-  if (demoSub) demoSub.textContent = cfg.demoSub;
-  if (demoIcon) demoIcon.textContent = cfg.icon;
-
   if (dialog && !dialog.open) {
     dialog.showModal();
   }
@@ -844,93 +801,14 @@ function openSocialModal(provider) {
 function initSocialAuth() {
   updateSocialCardUI();
 
-  // 1. Google Identity Services (GIS)
-  window.handleGoogleCredentialResponse = function(response) {
-    if (response && response.credential) {
-      const payload = parseJwt(response.credential);
-      if (payload && payload.picture) {
-        applySocialProfile({
-          name: payload.name || payload.given_name || 'Usuario Google',
-          imageUrl: payload.picture,
-          provider: 'google'
-        });
-      }
-    }
-  };
-
-  if (window.google?.accounts?.id) {
-    try {
-      window.google.accounts.id.initialize({
-        client_id: '1058293847291-exampledemo.apps.googleusercontent.com',
-        callback: window.handleGoogleCredentialResponse,
-        auto_select: false
-      });
-    } catch (e) {
-      console.warn('Google GIS notice:', e);
-    }
-  }
-
-  // 2. Facebook SDK
-  window.fbAsyncInit = function() {
-    if (window.FB) {
-      window.FB.init({
-        appId: '102938475612345',
-        cookie: true,
-        xfbml: true,
-        version: 'v19.0'
-      });
-    }
-  };
-
-  // Botones de inicio de sesión social
-  document.getElementById('btn-login-google')?.addEventListener('click', () => {
-    if (window.google?.accounts?.id) {
-      try {
-        window.google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            openSocialModal('google');
-          }
-        });
-        return;
-      } catch (err) {
-        // Fallback a modal
-      }
-    }
-    openSocialModal('google');
-  });
-
-  document.getElementById('btn-login-facebook')?.addEventListener('click', () => {
-    if (window.FB) {
-      try {
-        window.FB.login((response) => {
-          if (response.authResponse) {
-            window.FB.api('/me', { fields: 'name,picture.width(200).height(200)' }, (userData) => {
-              if (userData && userData.picture?.data?.url) {
-                applySocialProfile({
-                  name: userData.name || 'Usuario Facebook',
-                  imageUrl: userData.picture.data.url,
-                  provider: 'facebook'
-                });
-              }
-            });
-            return;
-          }
-          openSocialModal('facebook');
-        }, { scope: 'public_profile' });
-        return;
-      } catch (err) {
-        // Fallback a modal
-      }
-    }
-    openSocialModal('facebook');
-  });
-
-  document.getElementById('btn-login-instagram')?.addEventListener('click', () => {
-    openSocialModal('instagram');
-  });
-
+  // Botón para subir o enlazar foto de perfil personalizada
   document.getElementById('btn-upload-photo')?.addEventListener('click', () => {
-    document.getElementById('social-file-input')?.click();
+    const dialog = document.getElementById('social-auth-dialog');
+    if (dialog && typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      document.getElementById('social-file-input')?.click();
+    }
   });
 
   document.getElementById('btn-social-disconnect')?.addEventListener('click', () => {
@@ -949,39 +827,17 @@ function initSocialAuth() {
     if (currentRoomCode) {
       socket.emit('update_avatar', { avatarId: selectedAvatarId, avatarImageUrl: null });
     }
-    showToast('Foto de perfil desconectada. Usando ficha chilena estándar.');
+    showToast('Foto de ficha quitada. Usando ficha chilena estándar.');
   });
 
-  // Modal de opciones sociales
+  // Modal de opciones para foto personalizada
   document.getElementById('btn-close-social-dialog')?.addEventListener('click', () => {
     document.getElementById('social-auth-dialog')?.close();
   });
 
-  document.getElementById('btn-social-opt-demo')?.addEventListener('click', () => {
-    const demoProfiles = {
-      google: {
-        name: 'Alex Google',
-        imageUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-        provider: 'google'
-      },
-      facebook: {
-        name: 'Camila Facebook',
-        imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
-        provider: 'facebook'
-      },
-      instagram: {
-        name: 'Ignacio Instagram',
-        imageUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=200&auto=format&fit=crop&q=80',
-        provider: 'instagram'
-      },
-      upload: {
-        name: 'Jugador VIP',
-        imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-        provider: 'custom'
-      }
-    };
-    const prof = demoProfiles[activeSocialModalTarget] || demoProfiles.google;
-    applySocialProfile(prof);
+  document.getElementById('btn-social-opt-upload')?.addEventListener('click', () => {
+    document.getElementById('social-file-input')?.click();
+    document.getElementById('social-auth-dialog')?.close();
   });
 
   document.getElementById('btn-apply-avatar-url')?.addEventListener('click', () => {
@@ -994,13 +850,10 @@ function initSocialAuth() {
     applySocialProfile({
       name: null,
       imageUrl: url,
-      provider: activeSocialModalTarget || 'custom'
+      provider: 'custom'
     });
     if (input) input.value = '';
-  });
-
-  document.getElementById('btn-social-opt-upload')?.addEventListener('click', () => {
-    document.getElementById('social-file-input')?.click();
+    document.getElementById('social-auth-dialog')?.close();
   });
 
   document.getElementById('social-file-input')?.addEventListener('change', (e) => {
@@ -1444,6 +1297,9 @@ function bindUIEvents() {
 
   document.getElementById('btn-toggle-music')?.addEventListener('click', toggleMusicHandler);
   document.getElementById('btn-global-music-toggle')?.addEventListener('click', toggleMusicHandler);
+  document.getElementById('btn-prev-ai-song')?.addEventListener('click', () => {
+    prevAiSong();
+  });
   document.getElementById('btn-next-ai-song')?.addEventListener('click', () => {
     nextAiSong();
   });
@@ -1895,6 +1751,9 @@ function showPaymentPopup(payload) {
 
   amountEl.textContent = `-${formatCLP(payload.amount)}`;
 
+  // Sonido de caja registradora (cashier Ka-Ching!) en cada pago de Gran Santiago
+  playCashierSound();
+
   // Reiniciar barra de temporizador de 5 segundos
   if (timerFill) {
     timerFill.style.animation = 'none';
@@ -1932,6 +1791,518 @@ function closePaymentPopup() {
 socket.on('payment_popup', (payload) => {
   queueOrShowPaymentPopup(payload);
 });
+
+// ==========================================================================
+// CUENTA REGRESIVA ANIMADA DE 3 SEGUNDOS ANTES DE CUALQUIER JUEGO
+// ==========================================================================
+socket.on('game_countdown_start', ({ seconds = 3, gameType }) => {
+  const overlay = document.getElementById('game-countdown-overlay');
+  const titleEl = document.getElementById('countdown-game-title');
+  const numEl = document.getElementById('countdown-big-number');
+  const subEl = document.getElementById('countdown-subtext');
+  if (!overlay || !numEl) return;
+
+  const names = {
+    gran_santiago: 'GRAN SANTIAGO ONLINE',
+    cual_es: '¿CUÁL ES? (SÍMBOLOS CHILENOS)',
+    sudoku: 'SUDOKU COOPERATIVO',
+    crossword: 'CRUCIGRAMA PARTY',
+    pictionary: 'DOODLE PARTY'
+  };
+  if (titleEl) titleEl.textContent = names[gameType] || '¡A JUGAR!';
+
+  overlay.classList.remove('hidden');
+  let currentSec = seconds;
+
+  function tickCount() {
+    if (currentSec > 0) {
+      numEl.textContent = currentSec;
+      if (subEl) subEl.textContent = currentSec === 1 ? '¡Listos...!' : '¡Prepárate!';
+      playTone(520 + (3 - currentSec) * 120, 0.09, 'triangle');
+      numEl.style.animation = 'none';
+      void numEl.offsetWidth;
+      numEl.style.animation = 'countdownNumberZoom 0.9s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards';
+      currentSec -= 1;
+      setTimeout(tickCount, 950);
+    } else {
+      numEl.textContent = '¡A JUGAR!';
+      if (subEl) subEl.textContent = '¡Comienza la partida!';
+      playTone(784, 0.16, 'sine');
+      setTimeout(() => playTone(1046.5, 0.25, 'sine'), 110);
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+      }, 700);
+    }
+  }
+
+  tickCount();
+});
+
+// ==========================================================================
+// 10 MINIJUEGOS MULTIJUGADOR MARIO PARTY EN TIEMPO REAL
+// ==========================================================================
+let activeMinigameData = null;
+let minigameLocalTaps = 0;
+let minigameWheelRaf = null;
+
+socket.on('minigame_start', ({ minigame }) => {
+  activeMinigameData = minigame;
+  minigameLocalTaps = 0;
+
+  const overlay = document.getElementById('minigame-arena-overlay');
+  const titleEl = document.getElementById('minigame-title');
+  const potEl = document.getElementById('minigame-pot-amount');
+  const instrEl = document.getElementById('minigame-instructions');
+  const cdBox = document.getElementById('minigame-countdown-box');
+  const cdText = document.getElementById('minigame-countdown-text');
+  const resBox = document.getElementById('minigame-results-box');
+
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  if (resBox) resBox.classList.add('hidden');
+
+  if (titleEl) titleEl.textContent = `${minigame.icon} ${minigame.title}`;
+  if (potEl) potEl.textContent = `${formatCLP(minigame.betAmount)} por jugador`;
+  if (instrEl) instrEl.textContent = minigame.instruction;
+
+  if (cdBox) cdBox.classList.remove('hidden');
+  if (cdText) cdText.textContent = `¡Comienza en ${minigame.countdownNumber || 3}!`;
+
+  renderMinigameStage(minigame);
+  renderMinigamePlayers(minigame);
+});
+
+socket.on('minigame_update', ({ minigame }) => {
+  activeMinigameData = minigame;
+
+  const cdBox = document.getElementById('minigame-countdown-box');
+  const cdText = document.getElementById('minigame-countdown-text');
+
+  if (minigame.status === 'countdown') {
+    if (cdBox) cdBox.classList.remove('hidden');
+    if (cdText) cdText.textContent = `¡Comienza en ${minigame.countdownNumber || 3}!`;
+    playTone(440, 0.08, 'triangle');
+  } else if (minigame.status === 'active') {
+    if (cdBox) cdBox.classList.add('hidden');
+  }
+
+  // Barra de tiempo restante
+  const fill = document.getElementById('minigame-timer-fill');
+  if (fill && minigame.startedTimestamp && minigame.durationSec) {
+    const elapsed = Math.max(0, (Date.now() - minigame.startedTimestamp) / 1000);
+    const pct = Math.max(0, Math.min(100, (1 - elapsed / minigame.durationSec) * 100));
+    fill.style.width = `${pct}%`;
+  }
+
+  renderMinigameStage(minigame);
+  renderMinigamePlayers(minigame);
+});
+
+socket.on('minigame_end', ({ results, minigame }) => {
+  activeMinigameData = minigame;
+  if (minigameWheelRaf) {
+    cancelAnimationFrame(minigameWheelRaf);
+    minigameWheelRaf = null;
+  }
+
+  const resBox = document.getElementById('minigame-results-box');
+  const resContent = document.getElementById('minigame-results-content');
+  if (!resBox || !resContent || !results) return;
+
+  const iAmWinner = results.winners.some((w) => w.id === myPlayerId);
+  const iAmLoser = results.losers.some((l) => l.id === myPlayerId);
+
+  if (iAmWinner) {
+    playCashierSound();
+  } else if (iAmLoser) {
+    playTone(220, 0.3, 'sawtooth');
+  }
+
+  let html = '';
+  if (results.winners.length > 0) {
+    const wNames = results.winners.map((w) => `${w.avatar?.icon || '🏆'} ${w.name}`).join(', ');
+    html += `<div class="mg-winner-tag">🏆 Ganadores: ${wNames}</div>`;
+    html += `<p style="color:#86efac;margin-bottom:0.6rem;">Premio ganado: +${formatCLP(results.winners[0]?.share || 0)} cada uno</p>`;
+  }
+  if (results.losers.length > 0) {
+    const lNames = results.losers.map((l) => `${l.avatar?.icon || '💥'} ${l.name}`).join(', ');
+    html += `<div class="mg-loser-tag">💥 Perdedores: ${lNames}</div>`;
+    html += `<p style="color:#fca5a5;margin:0;">Pérdida al pozo: -${formatCLP(results.losers[0]?.lost || minigame.betAmount)}</p>`;
+  }
+
+  resContent.innerHTML = html;
+  resBox.classList.remove('hidden');
+
+  setTimeout(() => {
+    const overlay = document.getElementById('minigame-arena-overlay');
+    if (overlay) overlay.classList.add('hidden');
+  }, 4200);
+});
+
+function sendMinigameAction(data) {
+  socket.emit('minigame_action', data || {});
+}
+
+function renderMinigamePlayers(minigame) {
+  const strip = document.getElementById('minigame-players-strip');
+  if (!strip || !minigame.players) return;
+
+  const playersArr = Object.values(minigame.players);
+  let html = '';
+  playersArr.forEach((p) => {
+    const isMe = p.id === myPlayerId;
+    let scoreDisplay = p.score || 0;
+    if (minigame.id === 'reflejos_metro' && p.reactionTimeMs) {
+      scoreDisplay = `${(p.reactionTimeMs / 1000).toFixed(2)}s`;
+    }
+    const statusIcon = p.eliminated ? '❌' : (p.finished ? '✅' : '⏳');
+    html += `
+      <div class="mg-player-badge ${isMe ? 'is-me' : ''}">
+        <span>${p.avatar?.icon || '👤'}</span>
+        <strong>${p.name}${isMe ? ' (Tú)' : ''}</strong>
+        <span class="mg-score">${scoreDisplay}</span>
+        <span>${statusIcon}</span>
+      </div>
+    `;
+  });
+  strip.innerHTML = html;
+}
+
+function renderMinigameStage(minigame) {
+  const stage = document.getElementById('minigame-stage');
+  if (!stage) return;
+
+  const myState = minigame.players[myPlayerId];
+  const isActive = minigame.status === 'active';
+
+  switch (minigame.id) {
+    case 'bomba_tiempo': {
+      const holderId = minigame.gameData?.holderId;
+      const isHolder = holderId === myPlayerId;
+      let playersHtml = '';
+      Object.values(minigame.players).forEach((p) => {
+        const hasBomb = p.id === holderId;
+        playersHtml += `
+          <div class="mg-bomb-player ${hasBomb ? 'has-bomb' : ''}">
+            <span style="font-size:1.8rem;">${hasBomb ? '💣' : (p.avatar?.icon || '👤')}</span>
+            <small style="font-weight:700;">${p.name}</small>
+          </div>
+        `;
+      });
+
+      stage.innerHTML = `
+        <div class="mg-bomb-circle">${playersHtml}</div>
+        ${isActive ? (
+          isHolder
+            ? `<button id="btn-mg-bomb-pass" class="mg-big-button mg-btn-danger">💣 ¡PASAR LA BOMBA AHORA!</button>`
+            : `<div style="color:#94a3b8;font-size:1.1rem;font-weight:700;">¡Espera, otro jugador tiene la bomba!</div>`
+        ) : `<div style="font-size:1.1rem;color:#cbd5e1;">¡Preparando la dinamita!</div>`}
+      `;
+
+      document.getElementById('btn-mg-bomb-pass')?.addEventListener('click', () => {
+        sendMinigameAction({});
+        playTone(380, 0.08, 'triangle');
+      });
+      break;
+    }
+
+    case 'reflejos_metro': {
+      const now = Date.now();
+      const signalTime = minigame.gameData?.signalTimestamp || 0;
+      const isGreen = isActive && now >= signalTime;
+
+      stage.innerHTML = `
+        <div class="mg-metro-signal ${isGreen ? 'mg-signal-green' : 'mg-signal-red'}">
+          ${isGreen ? '🟢' : '🔴'}
+        </div>
+        <div style="font-size:1.15rem;font-weight:800;margin-bottom:1rem;color:${isGreen ? '#4ade80' : '#f87171'};">
+          ${isGreen ? '¡VERDE! ¡PASA TU TARJETA BIP!' : '¡ROJO! ¡NO TOQUES TODAVÍA!'}
+        </div>
+        <button id="btn-mg-metro-bip" class="mg-big-button ${isGreen ? 'mg-btn-success' : 'mg-btn-action'}" ${myState?.finished ? 'disabled' : ''}>
+          ${myState?.finished ? '✅ ¡Registrado!' : '💳 ¡PASAR BIP YA!'}
+        </button>
+      `;
+
+      document.getElementById('btn-mg-metro-bip')?.addEventListener('click', () => {
+        if (!myState?.finished) {
+          sendMinigameAction({});
+          playTone(isGreen ? 987 : 200, 0.12, 'sine');
+        }
+      });
+      break;
+    }
+
+    case 'empanada_rapida': {
+      const taps = myState?.taps || 0;
+      const pct = Math.min(100, taps * 4);
+
+      stage.innerHTML = `
+        <div style="font-size:3rem;margin-bottom:0.5rem;">🥟</div>
+        <div class="mg-empanada-meter">
+          <div class="mg-empanada-fill" style="width:${pct}%"></div>
+        </div>
+        <div style="font-size:1.1rem;font-weight:800;color:#fbbf24;margin-bottom:1rem;">
+          Empanadas devoradas: ${taps}
+        </div>
+        <button id="btn-mg-eat-empanada" class="mg-big-button mg-btn-action" ${!isActive ? 'disabled' : ''}>
+          🥟 ¡DEVORAR EMPANADA!
+        </button>
+      `;
+
+      document.getElementById('btn-mg-eat-empanada')?.addEventListener('click', () => {
+        if (isActive) {
+          minigameLocalTaps += 1;
+          sendMinigameAction({});
+          playTone(500 + (minigameLocalTaps % 8) * 45, 0.05, 'triangle');
+        }
+      });
+      break;
+    }
+
+    case 'ruleta_santiago': {
+      stage.innerHTML = `
+        <div class="mg-wheel-track">
+          <div id="mg-wheel-needle" class="mg-wheel-indicator" style="left:50%;"></div>
+        </div>
+        <div style="font-size:1.1rem;font-weight:700;margin-bottom:1rem;color:#cbd5e1;">
+          ${myState?.finished ? `🎯 Tu puntaje fijado: ${myState.score} pts` : '¡Detén el puntero en el centro verde!'}
+        </div>
+        <button id="btn-mg-stop-wheel" class="mg-big-button mg-btn-action" ${myState?.finished || !isActive ? 'disabled' : ''}>
+          🎡 ¡FRENAR RULETA!
+        </button>
+      `;
+
+      if (!myState?.finished && isActive && !minigameWheelRaf) {
+        let pos = 50;
+        let dir = 1;
+        function animNeedle() {
+          pos += dir * 2.8;
+          if (pos >= 96) { pos = 96; dir = -1; }
+          if (pos <= 4) { pos = 4; dir = 1; }
+          const needle = document.getElementById('mg-wheel-needle');
+          if (needle) needle.style.left = `${pos}%`;
+          if (activeMinigameData && activeMinigameData.status === 'active' && !myState?.finished) {
+            minigameWheelRaf = requestAnimationFrame(animNeedle);
+          }
+        }
+        minigameWheelRaf = requestAnimationFrame(animNeedle);
+      }
+
+      document.getElementById('btn-mg-stop-wheel')?.addEventListener('click', () => {
+        if (!myState?.finished && isActive) {
+          const needle = document.getElementById('mg-wheel-needle');
+          const leftPct = needle ? parseFloat(needle.style.left) : 50;
+          const distFromCenter = Math.abs(50 - leftPct);
+          const score = Math.max(1, Math.round(10 - distFromCenter / 5));
+          sendMinigameAction({ value: score });
+          playTone(660, 0.15, 'sine');
+        }
+      });
+      break;
+    }
+
+    case 'esquiva_tag': {
+      stage.innerHTML = `
+        <div style="font-size:3rem;margin-bottom:0.5rem;">🛣️</div>
+        <div class="mg-wheel-track" style="background:linear-gradient(90deg, #334155 0%, #10b981 40%, #10b981 60%, #334155 100%);">
+          <div id="mg-tag-bar" class="mg-wheel-indicator" style="left:50%;"></div>
+        </div>
+        <div style="font-size:1rem;color:#cbd5e1;margin-bottom:1rem;">
+          ${myState?.finished ? (myState.score > 0 ? '✅ ¡Saltaste con éxito!' : '💥 ¡Te pilló el TAG!') : '¡Salta cuando la barra pase por la zona VERDE!'}
+        </div>
+        <button id="btn-mg-jump-tag" class="mg-big-button mg-btn-action" ${myState?.finished || !isActive ? 'disabled' : ''}>
+          🦘 ¡SALTAR EL TAG!
+        </button>
+      `;
+
+      if (!myState?.finished && isActive && !minigameWheelRaf) {
+        let pos = 10;
+        let dir = 1;
+        function animTag() {
+          pos += dir * 2.5;
+          if (pos >= 90) { pos = 90; dir = -1; }
+          if (pos <= 10) { pos = 10; dir = 1; }
+          const bar = document.getElementById('mg-tag-bar');
+          if (bar) bar.style.left = `${pos}%`;
+          if (activeMinigameData && activeMinigameData.status === 'active' && !myState?.finished) {
+            minigameWheelRaf = requestAnimationFrame(animTag);
+          }
+        }
+        minigameWheelRaf = requestAnimationFrame(animTag);
+      }
+
+      document.getElementById('btn-mg-jump-tag')?.addEventListener('click', () => {
+        if (!myState?.finished && isActive) {
+          const bar = document.getElementById('mg-tag-bar');
+          const leftPct = bar ? parseFloat(bar.style.left) : 50;
+          const inGreen = leftPct >= 38 && leftPct <= 62;
+          sendMinigameAction({ inZone: inGreen });
+          playTone(inGreen ? 880 : 250, 0.15, inGreen ? 'sine' : 'sawtooth');
+        }
+      });
+      break;
+    }
+
+    case 'micro_llena': {
+      const seats = minigame.gameData?.availableSeats || 0;
+      const claimed = minigame.gameData?.claimedSeats || [];
+      const hasSeat = claimed.includes(myPlayerId);
+
+      stage.innerHTML = `
+        <div style="font-size:3.5rem;margin-bottom:0.5rem;">🚌🪑</div>
+        <div style="font-size:1.25rem;font-weight:800;color:#38bdf8;margin-bottom:0.5rem;">
+          Asientos libres restantes: ${seats}
+        </div>
+        <p style="color:#cbd5e1;font-size:0.95rem;margin-bottom:1rem;">
+          ${hasSeat ? '✅ ¡Conseguiste asiento en la micro!' : (seats === 0 ? '❌ ¡Micro completa! Te quedaste de pie.' : '¡Presiona rápido para sentarte!')}
+        </p>
+        <button id="btn-mg-take-seat" class="mg-big-button mg-btn-success" ${hasSeat || seats === 0 || !isActive ? 'disabled' : ''}>
+          🪑 ¡SENTARSE EN LA MICRO!
+        </button>
+      `;
+
+      document.getElementById('btn-mg-take-seat')?.addEventListener('click', () => {
+        if (!hasSeat && seats > 0 && isActive) {
+          sendMinigameAction({});
+          playTone(740, 0.12, 'sine');
+        }
+      });
+      break;
+    }
+
+    case 'lluvia_monedas': {
+      const myCoins = myState?.score || 0;
+      stage.innerHTML = `
+        <div style="font-size:1.15rem;font-weight:800;color:#facc15;margin-bottom:0.6rem;">
+          🪙 Monedas atrapadas: ${myCoins}
+        </div>
+        <div id="mg-coin-field" class="mg-coin-field">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#64748b;font-weight:700;pointer-events:none;">
+            ¡Toca las monedas que caen!
+          </div>
+        </div>
+      `;
+
+      const field = document.getElementById('mg-coin-field');
+      if (field && isActive && !field.dataset.spawnerStarted) {
+        field.dataset.spawnerStarted = 'true';
+        const spawnInterval = setInterval(() => {
+          if (!activeMinigameData || activeMinigameData.status !== 'active') {
+            clearInterval(spawnInterval);
+            return;
+          }
+          const coin = document.createElement('div');
+          coin.className = 'mg-falling-coin';
+          coin.textContent = Math.random() < 0.25 ? '💰' : (Math.random() < 0.5 ? '💵' : '🪙');
+          coin.style.left = `${Math.floor(Math.random() * 85)}%`;
+          const duration = 1.4 + Math.random() * 1.6;
+          coin.style.animationDuration = `${duration}s`;
+
+          const grabHandler = (e) => {
+            e.preventDefault();
+            sendMinigameAction({ coins: 1 });
+            playTone(800 + Math.random() * 400, 0.08, 'sine');
+            coin.remove();
+          };
+
+          coin.addEventListener('mousedown', grabHandler);
+          coin.addEventListener('touchstart', grabHandler, { passive: false });
+          field.appendChild(coin);
+
+          setTimeout(() => {
+            if (coin.parentNode) coin.remove();
+          }, duration * 1000);
+        }, 450);
+      }
+      break;
+    }
+
+    case 'tira_cuerda': {
+      const score = myState?.score || 0;
+      stage.innerHTML = `
+        <div style="font-size:3.5rem;margin-bottom:0.5rem;">🪢</div>
+        <div style="font-size:1.1rem;font-weight:800;color:#38bdf8;margin-bottom:1rem;">
+          Fuerza acumulada: ${score} kg
+        </div>
+        <button id="btn-mg-tug-pull" class="mg-big-button mg-btn-action" ${!isActive ? 'disabled' : ''}>
+          💪 ¡TIRAR CON TODA TU FUERZA!
+        </button>
+      `;
+
+      document.getElementById('btn-mg-tug-pull')?.addEventListener('click', () => {
+        if (isActive) {
+          sendMinigameAction({});
+          playTone(420 + (score % 6) * 50, 0.06, 'triangle');
+        }
+      });
+      break;
+    }
+
+    case 'memoria_santiago': {
+      const seq = minigame.gameData?.sequence || [];
+      const opts = minigame.gameData?.options || ['🦅', '🚇', '🗿', '🥟'];
+      const myStep = myState?.score || 0;
+
+      let seqDisplay = seq.map((s, i) => `<span style="font-size:2rem;margin:0 0.2rem;opacity:${i < myStep ? 0.35 : 1};">${s}</span>`).join('');
+      let buttonsHtml = opts.slice(0, 4).map((sym) => `
+        <button class="btn btn-secondary mg-sym-btn" data-sym="${sym}" style="font-size:1.8rem;padding:0.6rem 1rem;" ${!isActive || myState?.finished ? 'disabled' : ''}>
+          ${sym}
+        </button>
+      `).join('');
+
+      stage.innerHTML = `
+        <div style="margin-bottom:1rem;">${seqDisplay}</div>
+        <div style="font-size:0.95rem;color:#cbd5e1;margin-bottom:1rem;">
+          ${myState?.finished ? (myState.eliminated ? '❌ ¡Te equivocaste de símbolo!' : '✅ ¡Secuencia completada!') : `Repite el símbolo paso ${myStep + 1} de ${seq.length}`}
+        </div>
+        <div style="display:flex;gap:0.6rem;flex-wrap:wrap;justify-content:center;">
+          ${buttonsHtml}
+        </div>
+      `;
+
+      stage.querySelectorAll('.mg-sym-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (isActive && !myState?.finished) {
+            const sym = btn.getAttribute('data-sym');
+            sendMinigameAction({ stepIndex: myStep, symbol: sym });
+            playTone(600, 0.1, 'sine');
+          }
+        });
+      });
+      break;
+    }
+
+    case 'duelo_cronometro': {
+      const now = Date.now();
+      const start = minigame.startedTimestamp || now;
+      const elapsed = Math.max(0, (now - start) / 1000);
+      const isHidden = isActive && elapsed >= 2.5 && !myState?.finished;
+      const displayTime = myState?.finished
+        ? `${(myState.clickedTime || 5.0).toFixed(3)}s`
+        : (isHidden ? '⏱️ ???' : `${elapsed.toFixed(2)}s`);
+
+      stage.innerHTML = `
+        <div style="font-size:3.2rem;font-weight:900;color:${isHidden ? '#fbbf24' : '#38bdf8'};margin-bottom:0.8rem;letter-spacing:2px;">
+          ${displayTime}
+        </div>
+        <div style="font-size:0.95rem;color:#cbd5e1;margin-bottom:1.2rem;">
+          ${myState?.finished ? `🎯 Puntaje obtenido: ${myState.score} pts` : '¡Detén el reloj exactamente en 5.000 segundos!'}
+        </div>
+        <button id="btn-mg-stop-clock" class="mg-big-button mg-btn-danger" ${myState?.finished || !isActive ? 'disabled' : ''}>
+          ⏱️ ¡DETENER EN 5.00s!
+        </button>
+      `;
+
+      document.getElementById('btn-mg-stop-clock')?.addEventListener('click', () => {
+        if (!myState?.finished && isActive) {
+          sendMinigameAction({});
+          playTone(700, 0.15, 'sine');
+        }
+      });
+      break;
+    }
+  }
+}
 
 socket.on('cual_es_point', ({ playerId, playerName, symbol }) => {
   if (playerId === myPlayerId) {

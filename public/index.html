@@ -12,9 +12,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css" />
-  <!-- SDKs de Google y Facebook/Meta para Login Social -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script async defer crossorigin="anonymous" src="https://connect.facebook.net/es_LA/sdk.js"></script>
 </head>
 <body>
   <!-- Notificaciones flotantes (Toasts) -->
@@ -30,7 +27,8 @@
       <strong id="ai-music-track-name">Fiesta en Santiago (Electro-Party)</strong>
     </div>
     <button type="button" id="btn-global-music-toggle" class="btn-icon" title="Pausar/Reproducir Música IA">🎵</button>
-    <button type="button" id="btn-next-ai-song" class="btn-icon" title="Cambiar Canción IA">⏭️</button>
+    <button type="button" id="btn-prev-ai-song" class="btn-icon" title="Canción IA Anterior">⏮️</button>
+    <button type="button" id="btn-next-ai-song" class="btn-icon" title="Siguiente Canción IA">⏭️</button>
     <button type="button" id="btn-toggle-theme-global" class="btn-icon btn-theme-toggle" title="Alternar Modo Claro / Modo Oscuro">🌙</button>
   </div>
 
@@ -85,26 +83,12 @@
             <input type="text" id="input-player-name" maxlength="18" placeholder="Ej: Don Farkas, La Jefa, Seba..." autocomplete="off" />
           </div>
 
-          <!-- Iniciar Sesión con Redes Sociales (Google / Facebook / Instagram) -->
-          <div class="social-login-box">
-            <div class="social-login-header">
-              <span>📸 Inicia sesión para usar tu foto real de perfil:</span>
-            </div>
-            <div class="social-login-buttons">
-              <button type="button" id="btn-login-google" class="btn-social btn-google" title="Iniciar sesión con Google">
-                <svg viewBox="0 0 24 24" width="18" height="18" class="social-svg"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.94H1.27v3.15C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.26c-.25-.72-.38-1.49-.38-2.26s.13-1.54.38-2.26V6.59H1.27C.46 8.21 0 10.05 0 12s.46 3.79 1.27 5.41l4.01-3.15z"/><path fill="#EA4335" d="M12 4.77c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.27 6.59l4.01 3.15c.95-2.84 3.6-4.97 6.72-4.97z"/></svg>
-                <span>Google</span>
-              </button>
-              <button type="button" id="btn-login-facebook" class="btn-social btn-facebook" title="Iniciar sesión con Facebook">
-                <svg viewBox="0 0 24 24" width="18" height="18" class="social-svg" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                <span>Facebook</span>
-              </button>
-              <button type="button" id="btn-login-instagram" class="btn-social btn-instagram" title="Iniciar sesión con Instagram">
-                <svg viewBox="0 0 24 24" width="18" height="18" class="social-svg" fill="#E4405F"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
-                <span>Instagram</span>
-              </button>
-              <button type="button" id="btn-upload-photo" class="btn-social btn-custom-upload" title="Subir foto desde dispositivo o pegar URL">
-                <span>📁 Subir Foto</span>
+          <!-- Foto Personalizada para Ficha (Subir imagen o pegar URL) -->
+          <div class="custom-photo-box">
+            <div class="cpb-header">
+              <span>📸 Foto personalizada para tu ficha:</span>
+              <button type="button" id="btn-upload-photo" class="btn btn-secondary btn-xs" title="Subir foto desde dispositivo o pegar URL">
+                📁 Cargar Foto / URL
               </button>
               <input type="file" id="social-file-input" accept="image/*" class="hidden" />
             </div>
@@ -113,14 +97,12 @@
             <div id="social-connected-card" class="social-connected-card hidden">
               <div class="scc-avatar-wrap">
                 <img id="scc-avatar-img" src="" alt="Foto de perfil" class="scc-avatar-img" />
-                <span id="scc-provider-badge" class="scc-provider-badge">G</span>
               </div>
               <div class="scc-details">
-                <div class="scc-title">Foto de perfil conectada</div>
-                <strong id="scc-user-name">Usuario</strong>
-                <small id="scc-provider-desc">Cuenta de Google</small>
+                <div class="scc-title">Foto de ficha activa</div>
+                <strong id="scc-user-name">Ficha Personalizada</strong>
               </div>
-              <button type="button" id="btn-social-disconnect" class="btn btn-ghost btn-xs" title="Quitar foto y usar ficha normal">✕ Quitar</button>
+              <button type="button" id="btn-social-disconnect" class="btn btn-ghost btn-xs" title="Quitar foto y usar ficha estándar">✕ Quitar</button>
             </div>
           </div>
 
@@ -811,51 +793,97 @@
     </div>
   </dialog>
 
-  <!-- ================= MODAL NATIVO: CONEXIÓN DE FOTO DE PERFIL SOCIAL ================= -->
+  <!-- ================= MODAL NATIVO: CARGAR FOTO DE PERFIL / URL ================= -->
   <dialog id="social-auth-dialog" class="modern-dialog" closedby="any" aria-labelledby="social-dialog-title">
     <div class="dialog-card social-dialog-card">
       <div class="social-dialog-header">
-        <h3 id="social-dialog-title">📸 Conectar Foto de Perfil</h3>
+        <h3 id="social-dialog-title">📸 Foto para tu Ficha de Juego</h3>
         <button type="button" class="dialog-close-btn" id="btn-close-social-dialog">✕</button>
       </div>
       <div class="social-dialog-body">
-        <p id="social-dialog-desc">Elige cómo quieres conectar tu foto de perfil para usarla como ficha en el tablero:</p>
+        <p id="social-dialog-desc">Personaliza la ficha que te representará en el tablero subiendo una foto o ingresando su enlace:</p>
         
         <div class="social-options-list">
-          <!-- Opción 1: Simulación / Cuenta demo rápida con insignia oficial -->
-          <button type="button" id="btn-social-opt-demo" class="social-opt-btn">
-            <span class="sob-icon" id="sob-demo-icon">🌐</span>
-            <div class="sob-info">
-              <strong id="sob-demo-title">Usar perfil oficial con foto</strong>
-              <small id="sob-demo-sub">Foto de alta resolución y nombre verificado</small>
-            </div>
-            <span class="sob-arrow">➡️</span>
-          </button>
-
-          <!-- Opción 2: URL directa de imagen (Instagram, Google, Gravatar, etc.) -->
-          <div class="social-url-input-wrap">
-            <label for="input-social-avatar-url">🔗 O pega el enlace directo a tu foto:</label>
-            <div class="url-input-flex">
-              <input type="url" id="input-social-avatar-url" placeholder="https://lh3.googleusercontent.com/... o instagram" />
-              <button type="button" id="btn-apply-avatar-url" class="btn btn-primary btn-sm">Usar Foto</button>
-            </div>
-          </div>
-
-          <!-- Opción 3: Subir foto desde el dispositivo -->
+          <!-- Opción 1: Subir foto desde el dispositivo -->
           <button type="button" id="btn-social-opt-upload" class="social-opt-btn">
             <span class="sob-icon">📁</span>
             <div class="sob-info">
-              <strong>Subir imagen desde tu dispositivo</strong>
-              <small>Carga cualquier foto JPG, PNG o WebP de tu galería</small>
+              <strong>Subir imagen de tu dispositivo</strong>
+              <small>Elige cualquier imagen JPG, PNG o WebP de tu galería o archivos</small>
             </div>
             <span class="sob-arrow">⬆️</span>
           </button>
+
+          <!-- Opción 2: URL directa de imagen -->
+          <div class="social-url-input-wrap">
+            <label for="input-social-avatar-url">🔗 O pega un enlace directo a tu foto:</label>
+            <div class="url-input-flex">
+              <input type="url" id="input-social-avatar-url" placeholder="https://ejemplo.com/mifoto.jpg" />
+              <button type="button" id="btn-apply-avatar-url" class="btn btn-primary btn-sm">Usar Enlace</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </dialog>
 
+  <!-- ================= OVERLAY: CUENTA REGRESIVA 3 SEGUNDOS ANTES DE INICIAR CUALQUIER JUEGO ================= -->
+  <div id="game-countdown-overlay" class="game-countdown-overlay hidden" aria-hidden="true">
+    <div class="countdown-card">
+      <div class="countdown-game-title" id="countdown-game-title">GRAN SANTIAGO ONLINE</div>
+      <div class="countdown-num-wrapper">
+        <span class="countdown-big-number" id="countdown-big-number">3</span>
+      </div>
+      <div class="countdown-subtext" id="countdown-subtext">¡Prepárate!</div>
+    </div>
+  </div>
+
+  <!-- ================= OVERLAY: ARENA MULTIJUGADOR DE MINIJUEGOS MARIO PARTY ================= -->
+  <div id="minigame-arena-overlay" class="minigame-arena-overlay hidden" aria-modal="true" role="dialog">
+    <div class="minigame-card">
+      <div class="minigame-header">
+        <div class="minigame-title-group">
+          <span class="minigame-badge">🎮 DESAFÍO MARIO PARTY</span>
+          <h2 id="minigame-title" class="minigame-title">¡Nombre del Minijuego!</h2>
+        </div>
+        <div class="minigame-pot-info">
+          <span>Pozo en juego:</span>
+          <strong id="minigame-pot-amount">$200.000 CLP</strong>
+        </div>
+      </div>
+
+      <p id="minigame-instructions" class="minigame-instructions">Instrucciones...</p>
+
+      <!-- Cuenta regresiva interna del minijuego -->
+      <div id="minigame-countdown-box" class="minigame-countdown-box">
+        <span id="minigame-countdown-text">¡Comienza en 3!</span>
+      </div>
+
+      <!-- Escenario dinámico e interactivo del minijuego -->
+      <div id="minigame-stage" class="minigame-stage">
+        <!-- Renderizado dinámicamente según el tipo de minijuego -->
+      </div>
+
+      <!-- Barra de tiempo restante del minijuego -->
+      <div class="minigame-timer-bar">
+        <div id="minigame-timer-fill" class="minigame-timer-fill"></div>
+      </div>
+
+      <!-- Tabla de posiciones y jugadores en vivo -->
+      <div class="minigame-players-strip" id="minigame-players-strip">
+        <!-- Jugadores participantes con sus puntajes en tiempo real -->
+      </div>
+
+      <!-- Cuadro de resultados finales del minijuego -->
+      <div id="minigame-results-box" class="minigame-results-box hidden">
+        <h3 id="minigame-results-title">🏆 ¡Resultados del Desafío!</h3>
+        <div id="minigame-results-content"></div>
+      </div>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/musicJukebox.js"></script>
   <script src="/ghibliArt.js"></script>
   <script src="/santiagoMapAnimation.js"></script>
   <script src="/client.js"></script>

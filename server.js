@@ -12,6 +12,14 @@ const {
   CUAL_ES_SYMBOLS,
   generateCualEsDeck
 } = require('./boardData');
+const {
+  MINIGAME_DEFS,
+  ALL_MINIGAME_IDS,
+  createMinigameState,
+  handleMinigameAction,
+  simulateBotMinigameActions,
+  concludeMinigame
+} = require('./minigameManager');
 const { GameManager } = require('./gameparty_server/gameManager');
 const { getCategories } = require('./gameparty_server/crosswords/puzzles');
 
@@ -632,9 +640,119 @@ function applyCardAction(room, player, card, diceSum, ioInstance) {
       room.turnPhase = 'END_TURN';
       break;
     }
+    case 'get_out_of_jail': {
+      player.getOutOfJailCards = (player.getOutOfJailCards || 0) + 1;
+      addLog(room, `🎟️ ${player.name} guardó un salvoconducto de salida libre de la Comisaría.`, 'info');
+      room.turnPhase = 'END_TURN';
+      break;
+    }
+    case 'minigame': {
+      room.turnPhase = 'MINIGAME';
+      const mg = createMinigameState(room, card.minigameId, card.poolPerPlayer || 40000);
+      room.minigame = mg;
+      addLog(
+        room,
+        `🎮 ¡MINIJUEGO MARIO PARTY! "${mg.title}". ¡Todos compiten por ${formatCLP(mg.betAmount)} por jugador!`,
+        'warning'
+      );
+      broadcastRoomState(room);
+      startMinigameOrchestrator(room, ioInstance || io);
+      break;
+    }
     default:
       room.turnPhase = 'END_TURN';
   }
+}
+
+function startMinigameOrchestrator(room, ioInstance) {
+  if (!room || !room.minigame) return;
+  const targetIo = ioInstance || io;
+
+  targetIo.to(room.code).emit('minigame_start', {
+    minigame: room.minigame,
+    turnPhase: room.turnPhase
+  });
+
+  let count = 3;
+  const countdownInterval = setInterval(() => {
+    if (!room.minigame) {
+      clearInterval(countdownInterval);
+      return;
+    }
+    count -= 1;
+    if (count > 0) {
+      room.minigame.countdownNumber = count;
+      targetIo.to(room.code).emit('minigame_update', { minigame: room.minigame });
+    } else {
+      clearInterval(countdownInterval);
+      room.minigame.status = 'active';
+      room.minigame.countdownNumber = 0;
+      room.minigame.startedTimestamp = Date.now();
+      targetIo.to(room.code).emit('minigame_update', { minigame: room.minigame });
+
+      const durationMs = (room.minigame.durationSec || 6) * 1000;
+      const startTime = Date.now();
+
+      const gameInterval = setInterval(() => {
+        if (!room.minigame || room.minigame.status !== 'active') {
+          clearInterval(gameInterval);
+          return;
+        }
+
+        simulateBotMinigameActions(room);
+        targetIo.to(room.code).emit('minigame_update', { minigame: room.minigame });
+
+        const elapsed = Date.now() - startTime;
+        const allDone = Object.values(room.minigame.players).every((p) => p.finished || p.eliminated);
+
+        if (elapsed >= durationMs || allDone) {
+          clearInterval(gameInterval);
+          const results = concludeMinigame(room);
+
+          targetIo.to(room.code).emit('minigame_end', {
+            results,
+            minigame: room.minigame
+          });
+
+          if (results && results.winners && results.winners.length > 0) {
+            const winnersNames = results.winners.map((w) => w.name).join(', ');
+            addLog(
+              room,
+              `🏆 Ganador(es) del minijuego: ${winnersNames}. ¡Ganaron ${formatCLP(results.winners[0]?.share || 0)} cada uno!`,
+              'success'
+            );
+          }
+          if (results && results.losers && results.losers.length > 0) {
+            const losersNames = results.losers.map((l) => l.name).join(', ');
+            addLog(
+              room,
+              `💥 Perdedor(es) del minijuego: ${losersNames}. Perdieron ${formatCLP(results.totalPot / Math.max(1, results.losers.length))}.`,
+              'danger'
+            );
+          }
+
+          room.players.forEach((p) => {
+            if (p.money <= 0 && !p.bankrupt) {
+              autoRaiseFundsIfNeeded(room, p);
+            }
+          });
+
+          broadcastRoomState(room);
+
+          setTimeout(() => {
+            room.minigame = null;
+            room.turnPhase = 'END_TURN';
+            broadcastRoomState(room);
+
+            const current = getCurrentPlayer(room);
+            if (current && current.isBot && !current.bankrupt) {
+              scheduleBotPostLanding(room, current);
+            }
+          }, 4500);
+        }
+      }, 250);
+    }
+  }, 1000);
 }
 
 function handleRollDice(room, player, ioInstance) {
@@ -1243,6 +1361,13 @@ io.on('connection', (socket) => {
     room.winner = null;
     room.abandonVotes = [];
 
+    // Cuenta regresiva animada de 3 segundos antes de comenzar cualquier juego
+    io.to(room.code).emit('game_countdown_start', {
+      seconds: 3,
+      gameType: room.gameType
+    });
+    await new Promise((resolve) => setTimeout(resolve, 3100));
+
     if (room.gameType === 'crossword' || room.gameType === 'pictionary') {
       await gamePartyManager.startOrSyncUnifiedRoom({
         code: room.code,
@@ -1307,6 +1432,16 @@ io.on('connection', (socket) => {
 
     const res = handleCualEsClick(room, player, Number(symbolId));
     if (callback) callback(res);
+  });
+
+  // Acción en Minijuego multijugador estilo Mario Party
+  socket.on('minigame_action', (data) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || !room.minigame) return;
+    const res = handleMinigameAction(room, currentPlayerId, data || {});
+    if (res && res.ok) {
+      io.to(room.code).emit('minigame_update', { minigame: room.minigame });
+    }
   });
 
   // Volver al Lobby al terminar una partida (cualquier jugador si ya terminó, o el anfitrión en cualquier momento)

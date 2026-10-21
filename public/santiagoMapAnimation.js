@@ -1,13 +1,12 @@
 /**
- * santiagoMapAnimation.js
- * Mapa interactivo y animado de Santiago de Chile para el centro del tablero.
- * - Incluye las 40 casillas/tarjetas del Gran Santiago agrupadas por cercanía geográfica.
- * - Trazado de ruta completo conectando cada uno de los puntos del mapa.
- * - Resalte dinámico de propiedades compradas: halo de color del dueño y desplazamiento
- *   hacia el centro de la pantalla para identificar inmediatamente las propiedades del jugador.
+ * santiagoMapAnimation.js -> SantiagoMap (Modo Estático de Alto Rendimiento)
+ * Mapa cartográfico estático de Santiago de Chile para el centro del tablero.
+ * - Sin bucles continuos de animación ni buses en movimiento (ahorro total de CPU/batería).
+ * - Dibuja el valle central de Santiago, la Cordillera de los Andes con nieve, el Cerro San Cristóbal y el Río Mapocho.
+ * - Conecta los 40 puntos de las casillas/tarjetas del Gran Santiago agrupadas por cercanía geográfica.
+ * - Resalte estático de propiedades compradas: halo de color del dueño y desplazamiento hacia el centro.
+ * - Muestra en tiempo real la ubicación de cada jugador en el mapa sin lag.
  * - Soporta Modo Claro (Daylight) y Modo Oscuro (Night).
- * - Muestra en tiempo real el desplazamiento de los jugadores de punto a punto en Santiago.
- * - Anima los buses Transantiago / Red Movilidad por las avenidas con faros y estelas.
  */
 
 (function () {
@@ -15,16 +14,13 @@
 
   let canvas = null;
   let ctx = null;
-  let animId = null;
-  let lastTimestamp = 0;
-  let isRunning = false;
   let currentTheme = localStorage.getItem('gso_theme') || 'dark';
 
   let currentRoomState = null;
   let currentMyPlayerId = null;
+  let hoveredPointId = null;
 
-  // Coordenadas geográficas normalizadas [0..1] para las 40 casillas/tarjetas del Gran Santiago
-  // Agrupadas por estricta cercanía comunal
+  // Coordenadas geográficas normalizadas [0..1] para las 40 casillas del Gran Santiago
   const SANTIAGO_POINTS = [
     { id: 0, name: 'Plaza Baquedano', comuna: 'Santiago Centro / Providencia', x: 0.53, y: 0.48, color: '#ef4444', icon: '🇨🇱', type: 'go' },
     { id: 1, name: 'Av. Pajaritos', comuna: 'Maipú', x: 0.12, y: 0.62, color: '#8b4513', icon: '🐦', type: 'property' },
@@ -68,169 +64,19 @@
     { id: 39, name: 'Sanhattan (Costanera)', comuna: 'Las Condes', x: 0.74, y: 0.37, color: '#3b82f6', icon: '🏙️', type: 'property' }
   ];
 
-  // Rutas de buses Transantiago / Red
-  const MAP_ROUTES = [
-    {
-      id: 'alameda-providencia',
-      busNumber: '406',
-      busLine: '406 CANTAGALLO',
-      busColor: '#dc2626',
-      speed: 0.052,
-      path: [
-        { x: 0.12, y: 0.62 }, // Pajaritos
-        { x: 0.23, y: 0.58 }, // Est. Central
-        { x: 0.40, y: 0.54 }, // Alameda
-        { x: 0.53, y: 0.48 }, // Baquedano
-        { x: 0.65, y: 0.44 }, // Providencia
-        { x: 0.74, y: 0.37 }, // Sanhattan
-        { x: 0.82, y: 0.23 }  // Alonso de Córdova
-      ]
-    },
-    {
-      id: 'vicuna-mackenna',
-      busNumber: '210',
-      busLine: '210 PUENTE ALTO',
-      busColor: '#059669',
-      speed: 0.046,
-      path: [
-        { x: 0.53, y: 0.48 }, // Baquedano
-        { x: 0.60, y: 0.68 }, // Vicuña Mackenna
-        { x: 0.65, y: 0.74 }, // Macul
-        { x: 0.54, y: 0.90 }, // La Pintana
-        { x: 0.78, y: 0.94 }  // Puente Alto
-      ]
-    },
-    {
-      id: 'autopista-central',
-      busNumber: '301',
-      busLine: '301 SAN BERNARDO',
-      busColor: '#2563eb',
-      speed: 0.058,
-      path: [
-        { x: 0.42, y: 0.18 }, // Conchalí
-        { x: 0.44, y: 0.26 }, // Independencia
-        { x: 0.42, y: 0.40 }, // Cal y Canto
-        { x: 0.40, y: 0.54 }, // Alameda
-        { x: 0.38, y: 0.74 }, // Parque O'Higgins
-        { x: 0.40, y: 0.82 }  // Gran Avenida
-      ]
-    },
-    {
-      id: 'vespucio-circunvalacion',
-      busNumber: '506',
-      busLine: '506 PEÑALOLÉN',
-      busColor: '#d97706',
-      speed: 0.048,
-      path: [
-        { x: 0.30, y: 0.22 },
-        { x: 0.42, y: 0.18 },
-        { x: 0.76, y: 0.20 },
-        { x: 0.86, y: 0.28 },
-        { x: 0.76, y: 0.58 },
-        { x: 0.65, y: 0.74 },
-        { x: 0.40, y: 0.82 }
-      ]
-    }
+  // Rutas estáticas de las principales avenidas de Santiago
+  const STATIC_AVENUES = [
+    // Alameda - Providencia - Apoquindo
+    [ { x: 0.12, y: 0.62 }, { x: 0.23, y: 0.58 }, { x: 0.40, y: 0.54 }, { x: 0.53, y: 0.48 }, { x: 0.65, y: 0.44 }, { x: 0.74, y: 0.37 }, { x: 0.82, y: 0.23 } ],
+    // Vicuña Mackenna hacia Puente Alto
+    [ { x: 0.53, y: 0.48 }, { x: 0.60, y: 0.68 }, { x: 0.65, y: 0.74 }, { x: 0.54, y: 0.90 }, { x: 0.78, y: 0.94 } ],
+    // Gran Avenida hacia el sur
+    [ { x: 0.40, y: 0.54 }, { x: 0.38, y: 0.74 }, { x: 0.40, y: 0.82 } ],
+    // Independencia hacia el norte
+    [ { x: 0.42, y: 0.40 }, { x: 0.44, y: 0.26 }, { x: 0.42, y: 0.18 } ],
+    // Américo Vespucio Oriente / Oriente Cívico
+    [ { x: 0.82, y: 0.23 }, { x: 0.76, y: 0.58 }, { x: 0.66, y: 0.61 }, { x: 0.60, y: 0.68 } ]
   ];
-
-  // Buses en circulación
-  const buses = MAP_ROUTES.map((route, i) => ({
-    route,
-    progress: (i * 0.27) % 1.0,
-    direction: 1,
-    pauseTimer: 0
-  }));
-
-  // Registro de jugadores y sus movimientos en el mapa
-  const playerMapPositions = {}; // { [playerId]: { tileId, currentX, currentY, targetX, targetY, avatar, name, moving, timer, pulse } }
-  let activeMovementCallout = null;
-  let hoveredPointId = null;
-
-  function samplePathPoint(path, t) {
-    if (path.length < 2) return path[0] || { x: 0.5, y: 0.5 };
-    const segments = path.length - 1;
-    const segT = t * segments;
-    const segIdx = Math.min(Math.floor(segT), segments - 1);
-    const subT = segT - segIdx;
-    const p0 = path[segIdx];
-    const p1 = path[segIdx + 1];
-    const x = p0.x + (p1.x - p0.x) * subT;
-    const y = p0.y + (p1.y - p0.y) * subT;
-    const angle = Math.atan2(p1.y - p0.y, p1.x - p0.x);
-    return { x, y, angle };
-  }
-
-  function resizeCanvas() {
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(Math.floor(rect.width), 160) || 300;
-    const height = Math.max(Math.floor(rect.height), 160) || 300;
-
-    if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-    }
-  }
-
-  function updateGameState(state, myPlayerId) {
-    currentRoomState = state;
-    currentMyPlayerId = myPlayerId;
-  }
-
-  function setPlayerTile(playerId, playerName, playerAvatar, tileId, isMoving = false, avatarImageUrl = null) {
-    const pt = SANTIAGO_POINTS[tileId] || SANTIAGO_POINTS[0];
-    let existing = playerMapPositions[playerId];
-
-    if (!existing) {
-      existing = {
-        tileId,
-        currentX: pt.x,
-        currentY: pt.y,
-        targetX: pt.x,
-        targetY: pt.y,
-        avatar: playerAvatar || '👤',
-        avatarImageUrl: avatarImageUrl || null,
-        avatarImg: null,
-        name: playerName || 'Jugador',
-        moving: false,
-        pulse: 1.0
-      };
-      if (avatarImageUrl) {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = avatarImageUrl;
-        existing.avatarImg = img;
-      }
-      playerMapPositions[playerId] = existing;
-      return;
-    }
-
-    existing.name = playerName || existing.name;
-    existing.avatar = playerAvatar || existing.avatar;
-    if (avatarImageUrl && avatarImageUrl !== existing.avatarImageUrl) {
-      existing.avatarImageUrl = avatarImageUrl;
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = avatarImageUrl;
-      existing.avatarImg = img;
-    }
-
-    if (existing.tileId !== tileId || isMoving) {
-      existing.tileId = tileId;
-      existing.targetX = pt.x;
-      existing.targetY = pt.y;
-      existing.moving = true;
-      existing.pulse = 2.0;
-
-      activeMovementCallout = {
-        text: `${existing.avatar} ${existing.name} en ${pt.name} (${pt.comuna})`,
-        icon: pt.icon || '📍',
-        color: pt.color || '#38bdf8',
-        timestamp: Date.now()
-      };
-    }
-  }
 
   function getThemeColors() {
     const isLight = currentTheme === 'light';
@@ -246,26 +92,31 @@
       snowOpacity: isLight ? 0.9 : 0.45,
       riverOuter: isLight ? '#38bdf8' : '#0284c7',
       riverInner: isLight ? '#e0f2fe' : '#bae6fd',
-      riverShadow: isLight ? 'rgba(56, 189, 248, 0.4)' : '#38bdf8',
-      roadGlow: isLight ? 'rgba(203, 213, 225, 0.7)' : 'rgba(255, 255, 255, 0.08)',
-      roadBase: isLight ? '#94a3b8' : 'rgba(51, 65, 85, 0.9)',
-      roadDash: isLight ? '#f59e0b' : 'rgba(250, 204, 21, 0.45)',
-      circuitCasing: isLight ? 'rgba(37, 99, 235, 0.2)' : 'rgba(56, 189, 248, 0.22)',
-      circuitRoad: isLight ? '#cbd5e1' : 'rgba(30, 41, 59, 0.85)',
+      roadBase: isLight ? '#cbd5e1' : 'rgba(51, 65, 85, 0.7)',
+      roadDash: isLight ? '#f59e0b' : 'rgba(250, 204, 21, 0.4)',
       circuitLine: isLight ? '#2563eb' : '#38bdf8',
-      circuitPulse: isLight ? '#fbbf24' : '#facc15',
       sanCristobal: isLight ? 'rgba(34, 197, 94, 0.35)' : 'rgba(16, 185, 129, 0.3)',
       textMain: isLight ? '#0f172a' : '#f8fafc',
       textMuted: isLight ? '#475569' : '#94a3b8',
       pointBg: isLight ? '#ffffff' : '#0f172a',
-      pointBorder: isLight ? '#64748b' : '#38bdf8',
-      bannerBg: isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(15, 23, 42, 0.9)',
-      bannerBorder: isLight ? 'rgba(148, 163, 184, 0.45)' : 'rgba(255, 255, 255, 0.15)'
+      pointBorder: isLight ? '#64748b' : '#38bdf8'
     };
   }
 
-  function drawBackgroundMap(w, h, time, colors) {
-    // 1. Plano del valle de Santiago
+  function renderMap() {
+    if (!canvas || !ctx) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+    if (w <= 0 || h <= 0) return;
+
+    const colors = getThemeColors();
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // 1. Fondo base del valle de Santiago
     const gradBase = ctx.createLinearGradient(0, 0, w, h);
     gradBase.addColorStop(0, colors.bgGradStart);
     gradBase.addColorStop(0.5, colors.bgGradMid);
@@ -273,10 +124,10 @@
     ctx.fillStyle = gradBase;
     ctx.fillRect(0, 0, w, h);
 
-    // 2. Malla ortogonal de manzanas urbanas
+    // 2. Cuadrícula ortogonal de manzanas de la capital
     ctx.strokeStyle = colors.gridColor;
     ctx.lineWidth = 1;
-    const step = 26;
+    const step = 28;
     ctx.beginPath();
     for (let x = 0; x < w; x += step) {
       ctx.moveTo(x, 0);
@@ -288,7 +139,7 @@
     }
     ctx.stroke();
 
-    // 3. Cordillera de los Andes al Oriente (derecha)
+    // 3. Cordillera de los Andes al Oriente (silueta montañosa estática)
     ctx.save();
     const cordilleraGrad = ctx.createLinearGradient(w * 0.72, 0, w, 0);
     cordilleraGrad.addColorStop(0, 'rgba(0,0,0,0)');
@@ -308,7 +159,7 @@
     ctx.closePath();
     ctx.fill();
 
-    // Cumbres nevadas de los Andes
+    // Nieve en las altas cumbres
     ctx.fillStyle = colors.snowColor;
     ctx.globalAlpha = colors.snowOpacity;
     ctx.beginPath();
@@ -326,521 +177,214 @@
     // 4. Cerro San Cristóbal (Parque Metropolitano)
     const scX = w * 0.54;
     const scY = h * 0.36;
-    const scGrad = ctx.createRadialGradient(scX, scY, 4, scX, scY, 42);
+    const scGrad = ctx.createRadialGradient(scX, scY, 4, scX, scY, 40);
     scGrad.addColorStop(0, colors.sanCristobal);
     scGrad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = scGrad;
     ctx.beginPath();
-    ctx.arc(scX, scY, 42, 0, Math.PI * 2);
+    ctx.arc(scX, scY, 40, 0, Math.PI * 2);
     ctx.fill();
 
-    // Virgen del San Cristóbal con halo blanco
-    const virgenGlow = 0.5 + Math.sin(time * 0.003) * 0.25;
-    ctx.fillStyle = `rgba(255, 255, 255, ${virgenGlow})`;
-    ctx.beginPath();
-    ctx.arc(scX, scY - 4, 3.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 5. Sanhattan (Torre Costanera en Sanhattan)
-    const ccX = w * 0.74;
-    const ccY = h * 0.37;
-    const beacon = (Math.floor(time / 450) % 2 === 0);
-    ctx.fillStyle = beacon ? '#ef4444' : 'rgba(239, 68, 68, 0.25)';
-    ctx.beginPath();
-    ctx.arc(ccX, ccY - 8, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 6. Río Mapocho luminoso cruzando la ciudad de Este a Oeste
+    // 5. Río Mapocho cruzando Santiago
     ctx.save();
-    ctx.shadowColor = colors.riverShadow;
-    ctx.shadowBlur = colors.isLight ? 4 : 10;
-    ctx.strokeStyle = colors.riverOuter;
-    ctx.lineWidth = 4.2;
     ctx.beginPath();
-    ctx.moveTo(w * 0.94, h * 0.28);
-    ctx.bezierCurveTo(w * 0.76, h * 0.35, w * 0.62, h * 0.44, w * 0.53, h * 0.47);
-    ctx.bezierCurveTo(w * 0.42, h * 0.48, w * 0.30, h * 0.50, w * 0.16, h * 0.53);
-    ctx.lineTo(w * 0.04, h * 0.58);
+    ctx.moveTo(w * 0.95, h * 0.22);
+    ctx.bezierCurveTo(w * 0.78, h * 0.30, w * 0.65, h * 0.38, w * 0.53, h * 0.44);
+    ctx.bezierCurveTo(w * 0.42, h * 0.48, w * 0.28, h * 0.50, 0, h * 0.54);
+    ctx.strokeStyle = colors.riverOuter;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
     ctx.stroke();
 
+    ctx.beginPath();
+    ctx.moveTo(w * 0.95, h * 0.22);
+    ctx.bezierCurveTo(w * 0.78, h * 0.30, w * 0.65, h * 0.38, w * 0.53, h * 0.44);
+    ctx.bezierCurveTo(w * 0.42, h * 0.48, w * 0.28, h * 0.50, 0, h * 0.54);
     ctx.strokeStyle = colors.riverInner;
-    ctx.lineWidth = 1.6;
+    ctx.lineWidth = 2.5;
     ctx.stroke();
     ctx.restore();
-  }
 
-  // TRAZADO COMPLETO DE LA RUTA POR CADA PUNTO DEL MAPA (Los 40 puntos conectados en circuito)
-  function drawFullCircuitRoute(w, h, time, colors) {
-    if (SANTIAGO_POINTS.length < 2) return;
+    // 6. Principales avenidas de Santiago (estáticas)
+    STATIC_AVENUES.forEach((pts) => {
+      if (pts.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x * w, pts[0].y * h);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x * w, pts[i].y * h);
+      }
+      ctx.strokeStyle = colors.roadBase;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
 
-    ctx.save();
-    // 1. Resplandor base del trazado vial completo
-    ctx.strokeStyle = colors.circuitCasing;
-    ctx.lineWidth = 6;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    SANTIAGO_POINTS.forEach((pt, idx) => {
-      const px = pt.x * w;
-      const py = pt.y * h;
-      if (idx === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x * w, pts[0].y * h);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x * w, pts[i].y * h);
+      }
+      ctx.strokeStyle = colors.roadDash;
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([4, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
     });
-    // Cerrar el circuito de vuelta a la Partida (punto 0)
-    ctx.lineTo(SANTIAGO_POINTS[0].x * w, SANTIAGO_POINTS[0].y * h);
-    ctx.stroke();
 
-    // 2. Línea asfáltica principal del circuito
-    ctx.strokeStyle = colors.circuitRoad;
-    ctx.lineWidth = 2.8;
-    ctx.stroke();
-
-    // 3. Demarcación animada discontinua (flujo de energía / tránsito continuo)
+    // 7. Trazado del circuito conectando los 40 puntos
+    ctx.save();
+    ctx.beginPath();
+    const p0 = SANTIAGO_POINTS[0];
+    ctx.moveTo(p0.x * w, p0.y * h);
+    for (let i = 1; i < SANTIAGO_POINTS.length; i++) {
+      ctx.lineTo(SANTIAGO_POINTS[i].x * w, SANTIAGO_POINTS[i].y * h);
+    }
+    ctx.closePath();
     ctx.strokeStyle = colors.circuitLine;
-    ctx.lineWidth = 1.4;
-    ctx.setLineDash([7, 6]);
-    ctx.lineDashOffset = -time * 0.016; // Flujo animado
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([3, 5]);
     ctx.stroke();
     ctx.setLineDash([]);
-
-    // 4. Pulso de energía luminoso que recorre el circuito de puntos
-    const circuitProgress = ((time * 0.00015) % 1.0);
-    const pulsePt = samplePathPoint(SANTIAGO_POINTS, circuitProgress);
-    ctx.fillStyle = colors.circuitPulse;
-    ctx.shadowColor = colors.circuitPulse;
-    ctx.shadowBlur = 10;
-    ctx.beginPath();
-    ctx.arc(pulsePt.x * w, pulsePt.y * h, 3.5, 0, Math.PI * 2);
-    ctx.fill();
     ctx.restore();
-  }
 
-  // Dibuja los 40 puntos geográficos de las tarjetas del Gran Santiago
-  // Resalta las propiedades del jugador con halo dorado y desplazamiento al centro
-  function drawSantiagoPoints(w, h, time, colors) {
+    // 8. Dibujar los 40 puntos de las tarjetas con sus propiedades y halos
     const centerX = w * 0.5;
     const centerY = h * 0.5;
+    const isMobile = w < 480;
 
     SANTIAGO_POINTS.forEach((pt) => {
-      const origPx = pt.x * w;
-      const origPy = pt.y * h;
-      const isHovered = hoveredPointId === pt.id;
+      let px = pt.x * w;
+      let py = pt.y * h;
 
-      // Estado de propiedad en la partida
       const propState = currentRoomState?.properties?.[pt.id];
       const ownerId = propState?.ownerId;
-      const isOwnedByMe = Boolean(ownerId && currentMyPlayerId && ownerId === currentMyPlayerId);
-      const isOwnedByOther = Boolean(ownerId && (!currentMyPlayerId || ownerId !== currentMyPlayerId));
-      const owner = isOwnedByOther ? currentRoomState?.players?.find((p) => p.id === ownerId) : null;
+      const isOwned = Boolean(ownerId);
+      const isOwnedByMe = isOwned && (ownerId === currentMyPlayerId);
+      const ownerPlayer = isOwned ? currentRoomState?.players?.find((p) => p.id === ownerId) : null;
+      const ownerColor = ownerPlayer?.color || '#3b82f6';
 
-      // Calcular acercamiento de píxeles hacia el centro de la pantalla
-      let finalPx = origPx;
-      let finalPy = origPy;
-
-      if (isOwnedByMe) {
-        // Desplazar 9 píxeles hacia el centro de Santiago para que destaque físicamente
-        const dx = centerX - origPx;
-        const dy = centerY - origPy;
+      // Si tiene dueño, acercar unos píxeles al centro del mapa
+      if (isOwned) {
+        const dx = centerX - px;
+        const dy = centerY - py;
         const dist = Math.hypot(dx, dy) || 1;
-        finalPx = origPx + (dx / dist) * 10;
-        finalPy = origPy + (dy / dist) * 10;
-      } else if (isOwnedByOther) {
-        // Desplazar 4.5 píxeles hacia el centro
-        const dx = centerX - origPx;
-        const dy = centerY - origPy;
-        const dist = Math.hypot(dx, dy) || 1;
-        finalPx = origPx + (dx / dist) * 5;
-        finalPy = origPy + (dy / dist) * 5;
+        const shift = isOwnedByMe ? 9 : 5;
+        px += (dx / dist) * shift;
+        py += (dy / dist) * shift;
       }
 
-      ctx.save();
-
-      // ================= CASO 1: PROPIEDAD DEL JUGADOR LOCAL (RESALTADO MÁXIMO) =================
-      if (isOwnedByMe) {
-        // 1. Halo dorado / ámbar resplandeciente con pulso
-        const glowRadius = 12 + Math.sin(time * 0.005) * 3.5;
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 2.5;
-        ctx.shadowColor = '#f59e0b';
-        ctx.shadowBlur = 14;
+      // Halo de propiedad comprada
+      if (isOwned) {
+        ctx.save();
         ctx.beginPath();
-        ctx.arc(finalPx, finalPy, glowRadius, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 2. Línea guía punteada conectando el punto original desplazado
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([2, 3]);
-        ctx.beginPath();
-        ctx.moveTo(origPx, origPy);
-        ctx.lineTo(finalPx, finalPy);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // 3. Nodo central dorado grande
-        ctx.fillStyle = '#fef08a';
-        ctx.strokeStyle = '#d97706';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(finalPx, finalPy, 7.5, 0, Math.PI * 2);
+        ctx.arc(px, py, isOwnedByMe ? 12 : 9, 0, Math.PI * 2);
+        ctx.fillStyle = ownerColor;
+        ctx.globalAlpha = isOwnedByMe ? 0.35 : 0.2;
         ctx.fill();
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // 4. Badge flotante: 🔑 TÚ / Edificaciones
-        ctx.fillStyle = '#f59e0b';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        let deedTag = '🔑 MÍA';
-        if (propState.houses === 5) deedTag = '🏨 HOTEL';
-        else if (propState.houses > 0) deedTag = `🏠 ${propState.houses}`;
-
-        ctx.font = 'bold 8px system-ui, sans-serif';
-        const tagW = ctx.measureText(deedTag).width + 8;
-        ctx.beginPath();
-        ctx.roundRect(finalPx - tagW / 2, finalPy - 22, tagW, 12, 3);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#0f172a';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(deedTag, finalPx, finalPy - 16);
-
-        // Nombre de la propiedad destacado
-        ctx.fillStyle = colors.isLight ? '#0f172a' : '#fde047';
-        ctx.font = 'bold 8.5px system-ui, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(`${pt.name}`, finalPx + 11, finalPy + 3);
-      }
-      // ================= CASO 2: PROPIEDAD DE UN OPONENTE =================
-      else if (isOwnedByOther && owner) {
-        const ownerColor = owner.avatar?.color || '#ef4444';
-
-        // Anillo con el color del oponente
+        ctx.lineWidth = isOwnedByMe ? 2.5 : 1.5;
         ctx.strokeStyle = ownerColor;
-        ctx.lineWidth = 2.2;
-        ctx.fillStyle = colors.pointBg;
-        ctx.beginPath();
-        ctx.arc(finalPx, finalPy, 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        // Mini avatar o inicial del dueño
-        ctx.font = '7.5px system-ui';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(owner.avatar?.icon || '👤', finalPx, finalPy);
-
-        if (isHovered) {
-          ctx.fillStyle = ownerColor;
-          ctx.font = 'bold 8px system-ui, sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText(`🏢 ${pt.name} (${owner.name})`, finalPx + 9, finalPy + 3);
-        }
-      }
-      // ================= CASO 3: PROPIEDAD O CASILLA DISPONIBLE / ESPECIAL =================
-      else {
-        ctx.fillStyle = colors.pointBg;
-        ctx.strokeStyle = isHovered ? '#f59e0b' : pt.color;
-        ctx.lineWidth = isHovered ? 2.5 : 1.2;
-
-        if (pt.id === 0 || pt.id === 20 || pt.id === 39) {
-          const pulseR = 7 + Math.sin(time * 0.004 + pt.id) * 3;
-          ctx.beginPath();
-          ctx.arc(finalPx, finalPy, pulseR, 0, Math.PI * 2);
-          ctx.strokeStyle = isHovered ? 'rgba(245, 158, 11, 0.45)' : `${pt.color}55`;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-
-        ctx.beginPath();
-        ctx.arc(finalPx, finalPy, isHovered ? 5.5 : 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        const isMajor = pt.id === 0 || pt.id === 1 || pt.id === 5 || pt.id === 13 || pt.id === 20 || pt.id === 26 || pt.id === 31 || pt.id === 39;
-        if (isHovered || isMajor) {
-          ctx.fillStyle = isHovered ? '#fbbf24' : colors.textMuted;
-          ctx.font = isHovered ? 'bold 8.5px system-ui, sans-serif' : '7.5px system-ui, sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText(`${pt.icon} ${pt.name}`, finalPx + 7, finalPy + 3);
-        }
-      }
-
-      ctx.restore();
-    });
-  }
-
-  function drawBus(bus, w, h, time, colors) {
-    const pt = samplePathPoint(bus.route.path, bus.progress);
-    const px = pt.x * w;
-    const py = pt.y * h;
-    let angle = pt.angle;
-    if (bus.direction < 0) {
-      angle += Math.PI;
-    }
-
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(angle);
-
-    // Haz de luz de los focos delanteros
-    ctx.save();
-    const lightGrad = ctx.createRadialGradient(8, 0, 2, 42, 0, 32);
-    lightGrad.addColorStop(0, colors.isLight ? 'rgba(254, 240, 138, 0.45)' : 'rgba(254, 240, 138, 0.7)');
-    lightGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
-    ctx.fillStyle = lightGrad;
-    ctx.beginPath();
-    ctx.moveTo(8, -4);
-    ctx.lineTo(44, -16);
-    ctx.lineTo(44, 16);
-    ctx.lineTo(8, 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    // Luces traseras rojas
-    ctx.fillStyle = '#ef4444';
-    ctx.fillRect(-10, -3.5, 2, 2);
-    ctx.fillRect(-10, 1.5, 2, 2);
-
-    // Carrocería del bus
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.fillRect(-8, -5, 18, 10);
-
-    ctx.fillStyle = bus.route.busColor;
-    ctx.beginPath();
-    ctx.roundRect(-8, -4.5, 17, 9, 2);
-    ctx.fill();
-
-    // Techo blanco estándar Red
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(-7, -4, 15, 3);
-
-    // Parabrisas
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(4, -3.5, 4, 7);
-    ctx.fillRect(-5, -4, 8, 2);
-    ctx.fillRect(-5, 2, 8, 2);
-
-    // Letrero LED verde
-    ctx.fillStyle = '#22c55e';
-    ctx.fillRect(5, -2, 2, 4);
-
-    ctx.restore();
-
-    // Número de recorrido flotante
-    ctx.save();
-    ctx.fillStyle = colors.bannerBg;
-    ctx.strokeStyle = bus.route.busColor;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(px - 13, py - 16, 26, 10, 3);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = colors.textMain;
-    ctx.font = 'bold 7.5px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(bus.route.busNumber, px, py - 11);
-    ctx.restore();
-  }
-
-  function drawPlayersOnMap(w, h, time, delta, colors) {
-    Object.keys(playerMapPositions).forEach((pId) => {
-      const p = playerMapPositions[pId];
-      if (!p) return;
-
-      const targetPx = p.targetX * w;
-      const targetPy = p.targetY * h;
-      let currentPx = p.currentX * w;
-      let currentPy = p.currentY * h;
-
-      const dist = Math.hypot(targetPx - currentPx, targetPy - currentPy);
-      if (dist > 1) {
-        p.currentX += (p.targetX - p.currentX) * Math.min(delta * 5, 0.25);
-        p.currentY += (p.targetY - p.currentY) * Math.min(delta * 5, 0.25);
-        currentPx = p.currentX * w;
-        currentPy = p.currentY * h;
-
-        ctx.save();
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(currentPx, currentPy);
-        ctx.lineTo(targetPx, targetPy);
+        ctx.globalAlpha = 0.9;
         ctx.stroke();
         ctx.restore();
-      } else {
-        p.moving = false;
       }
 
-      if (p.pulse > 1.0) {
-        p.pulse -= delta * 0.8;
-        const pingRadius = 10 + (2.0 - p.pulse) * 20;
+      // Punto base
+      ctx.beginPath();
+      const r = isOwned ? (isOwnedByMe ? 6.5 : 5.5) : 4.5;
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fillStyle = pt.color || colors.pointBg;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = colors.pointBorder;
+      ctx.stroke();
+
+      // En pantallas medianas o si el punto está en hover, dibujar etiqueta
+      if (!isMobile || hoveredPointId === pt.id || isOwned) {
+        ctx.font = '10px sans-serif';
+        ctx.fillStyle = colors.textMain;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const labelText = isOwned && ownerPlayer ? `${ownerPlayer.avatar?.icon || '🏠'} ${pt.name}` : pt.name;
+        ctx.fillText(labelText, px, py - 6);
+      }
+    });
+
+    // 9. Dibujar las fichas de los jugadores en sus posiciones actuales
+    if (currentRoomState && currentRoomState.players) {
+      currentRoomState.players.forEach((p, idx) => {
+        if (p.bankrupt) return;
+        const tile = SANTIAGO_POINTS[p.position % SANTIAGO_POINTS.length];
+        if (!tile) return;
+
+        // Desfase en caso de coincidir varios jugadores en la misma casilla
+        const angle = (idx / Math.max(1, currentRoomState.players.length)) * Math.PI * 2;
+        const offsetDist = currentRoomState.players.length > 1 ? 12 : 0;
+        const fx = tile.x * w + Math.cos(angle) * offsetDist;
+        const fy = tile.y * h + Math.sin(angle) * offsetDist;
+
+        // Ficha del jugador
         ctx.save();
-        ctx.strokeStyle = `rgba(56, 189, 248, ${Math.max(0, p.pulse - 1.0)})`;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 11, 0, Math.PI * 2);
+        ctx.fillStyle = p.color || '#22c55e';
+        ctx.shadowColor = 'rgba(0,0,0,0.4)';
+        ctx.shadowBlur = 4;
+        ctx.fill();
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(currentPx, currentPy, pingRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffffff';
         ctx.stroke();
-        ctx.restore();
-      }
 
-      ctx.save();
-      ctx.shadowColor = '#38bdf8';
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = colors.bannerBg;
-      ctx.beginPath();
-      ctx.arc(currentPx, currentPy - 10, 11, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = '#2563eb';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      if (p.avatarImg && p.avatarImg.complete && p.avatarImg.naturalWidth > 0) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(currentPx, currentPy - 10, 10, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(p.avatarImg, currentPx - 10, currentPy - 20, 20, 20);
-        ctx.restore();
-      } else {
-        ctx.font = '12px system-ui';
+        // Icono o inicial
+        ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(p.avatar || '👤', currentPx, currentPy - 10);
-      }
-
-      ctx.fillStyle = '#2563eb';
-      ctx.beginPath();
-      ctx.moveTo(currentPx - 3.5, currentPy);
-      ctx.lineTo(currentPx + 3.5, currentPy);
-      ctx.lineTo(currentPx, currentPy + 4);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = colors.bannerBg;
-      ctx.strokeStyle = colors.bannerBorder;
-      ctx.lineWidth = 1;
-      const textWidth = ctx.measureText(p.name).width;
-      ctx.beginPath();
-      ctx.roundRect(currentPx - textWidth / 2 - 4, currentPy - 26, textWidth + 8, 12, 3);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = colors.textMain;
-      ctx.font = 'bold 8px system-ui, sans-serif';
-      ctx.fillText(p.name, currentPx, currentPy - 20);
-      ctx.restore();
-    });
-  }
-
-  function drawMovementCallout(w, h, time, colors) {
-    if (!activeMovementCallout) return;
-    const age = (Date.now() - activeMovementCallout.timestamp) / 1000;
-    if (age > 4.5) {
-      activeMovementCallout = null;
-      return;
+        ctx.fillText(p.avatar?.icon || p.name.charAt(0), fx, fy);
+        ctx.restore();
+      });
     }
 
-    const alpha = age < 0.3 ? (age / 0.3) : (age > 3.8 ? (4.5 - age) / 0.7 : 1.0);
-    ctx.save();
-    ctx.globalAlpha = alpha;
-
-    const bannerW = Math.min(w * 0.82, 320);
-    const bannerH = 22;
-    const bannerX = (w - bannerW) / 2;
-    const bannerY = h - 34;
-
-    ctx.fillStyle = colors.bannerBg;
-    ctx.strokeStyle = activeMovementCallout.color || '#38bdf8';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 999);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = colors.textMain;
-    ctx.font = 'bold 8.5px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`🗺️ ${activeMovementCallout.text}`, w / 2, bannerY + bannerH / 2);
     ctx.restore();
   }
 
-  function animationLoop(timestamp) {
-    if (!isRunning) return;
-    if (!lastTimestamp) lastTimestamp = timestamp;
-    const delta = Math.min((timestamp - lastTimestamp) / 1000, 0.1);
-    lastTimestamp = timestamp;
+  function resizeCanvas() {
+    if (!canvas) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
 
-    if (!canvas || !ctx) {
-      animId = requestAnimationFrame(animationLoop);
-      return;
-    }
-
+    const rect = parent.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = canvas.width / dpr;
-    const h = canvas.height / dpr;
-    const colors = getThemeColors();
+    const width = Math.max(rect.width, 280);
+    const height = Math.max(rect.height, 280);
 
-    ctx.save();
-    ctx.scale(dpr, dpr);
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
 
-    // 1. Mapa cartográfico de base (valle, cerros, río)
-    drawBackgroundMap(w, h, timestamp, colors);
-
-    // 2. TRAZADO DE RUTA COMPLETO POR CADA PUNTO DEL MAPA (Los 40 puntos conectados en circuito)
-    drawFullCircuitRoute(w, h, timestamp, colors);
-
-    // 3. Puntos reales de las 40 tarjetas con resalte de propiedades compradas y acercamiento
-    drawSantiagoPoints(w, h, timestamp, colors);
-
-    // 4. Buses Transantiago / Red recorriendo las calles
-    buses.forEach((bus) => {
-      if (bus.pauseTimer > 0) {
-        bus.pauseTimer -= delta;
-      } else {
-        bus.progress += bus.direction * bus.route.speed * delta;
-        if (bus.progress >= 1.0) {
-          bus.progress = 1.0;
-          bus.direction = -1;
-          bus.pauseTimer = 1.2;
-        } else if (bus.progress <= 0.0) {
-          bus.progress = 0.0;
-          bus.direction = 1;
-          bus.pauseTimer = 1.2;
-        }
-      }
-      drawBus(bus, w, h, timestamp, colors);
-    });
-
-    // 5. Jugadores moviéndose sobre el mapa
-    drawPlayersOnMap(w, h, timestamp, delta, colors);
-
-    // 6. Notificación activa de movimiento
-    drawMovementCallout(w, h, timestamp, colors);
-
-    ctx.restore();
-
-    animId = requestAnimationFrame(animationLoop);
+    renderMap();
   }
 
   function setTheme(theme) {
     currentTheme = theme === 'light' ? 'light' : 'dark';
     localStorage.setItem('gso_theme', currentTheme);
-    if (canvas) {
-      resizeCanvas();
-    }
+    renderMap();
   }
 
-  function initMapAnimation() {
+  function updateGameState(roomState, myPlayerId) {
+    currentRoomState = roomState;
+    currentMyPlayerId = myPlayerId;
+    renderMap();
+  }
+
+  function setPlayerTile(playerId, tileId) {
+    if (currentRoomState && currentRoomState.players) {
+      const pl = currentRoomState.players.find((p) => p.id === playerId);
+      if (pl) pl.position = tileId;
+    }
+    renderMap();
+  }
+
+  function initStaticMap() {
     canvas = document.getElementById('santiago-map-canvas');
     if (!canvas) return;
 
@@ -848,7 +392,7 @@
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Detección de hover y toque táctil sobre los puntos de las tarjetas
+    // Detección de hover y toque sobre los puntos
     function detectPointAt(clientX, clientY) {
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -856,24 +400,12 @@
       const h = canvas.height / dpr;
       const mouseX = clientX - rect.left;
       const mouseY = clientY - rect.top;
-      const centerX = w * 0.5;
-      const centerY = h * 0.5;
 
       let found = null;
-      const hitRadius = window.matchMedia && window.matchMedia('(pointer: coarse)').matches ? 24 : 15;
+      const hitRadius = 18;
       for (const pt of SANTIAGO_POINTS) {
-        let px = pt.x * w;
-        let py = pt.y * h;
-        const propState = currentRoomState?.properties?.[pt.id];
-        if (propState?.ownerId) {
-          const isOwnedByMe = propState.ownerId === currentMyPlayerId;
-          const dx = centerX - px;
-          const dy = centerY - py;
-          const dist = Math.hypot(dx, dy) || 1;
-          const shift = isOwnedByMe ? 10 : 5;
-          px += (dx / dist) * shift;
-          py += (dy / dist) * shift;
-        }
+        const px = pt.x * w;
+        const py = pt.y * h;
         if (Math.hypot(mouseX - px, mouseY - py) < hitRadius) {
           found = pt.id;
           break;
@@ -883,23 +415,14 @@
     }
 
     canvas.addEventListener('mousemove', (e) => {
+      const prev = hoveredPointId;
       hoveredPointId = detectPointAt(e.clientX, e.clientY);
+      if (prev !== hoveredPointId) renderMap();
     });
-
-    canvas.addEventListener('touchstart', (e) => {
-      if (e.touches && e.touches[0]) {
-        const found = detectPointAt(e.touches[0].clientX, e.touches[0].clientY);
-        if (found !== null) {
-          hoveredPointId = found;
-          if (typeof window.openPropertyModal === 'function') {
-            window.openPropertyModal(found);
-          }
-        }
-      }
-    }, { passive: true });
 
     canvas.addEventListener('mouseleave', () => {
       hoveredPointId = null;
+      renderMap();
     });
 
     canvas.addEventListener('click', () => {
@@ -908,46 +431,33 @@
       }
     });
 
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        stopMapAnimation();
-      } else {
-        startMapAnimation();
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches[0]) {
+        const found = detectPointAt(e.touches[0].clientX, e.touches[0].clientY);
+        if (found !== null && typeof window.openPropertyModal === 'function') {
+          window.openPropertyModal(found);
+        }
       }
-    });
+    }, { passive: true });
 
-    startMapAnimation();
-  }
-
-  function startMapAnimation() {
-    if (isRunning) return;
-    isRunning = true;
-    lastTimestamp = 0;
-    animId = requestAnimationFrame(animationLoop);
-  }
-
-  function stopMapAnimation() {
-    isRunning = false;
-    if (animId) {
-      cancelAnimationFrame(animId);
-      animId = null;
-    }
+    renderMap();
   }
 
   window.SantiagoMapAnimation = {
-    init: initMapAnimation,
-    start: startMapAnimation,
-    stop: stopMapAnimation,
+    init: initStaticMap,
+    start: () => renderMap(),
+    stop: () => {},
     resize: resizeCanvas,
     setTheme: setTheme,
     setPlayerTile: setPlayerTile,
     updateGameState: updateGameState,
+    render: renderMap,
     SANTIAGO_POINTS: SANTIAGO_POINTS
   };
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initMapAnimation);
+    document.addEventListener('DOMContentLoaded', initStaticMap);
   } else {
-    setTimeout(initMapAnimation, 50);
+    setTimeout(initStaticMap, 50);
   }
 })();

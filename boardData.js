@@ -584,6 +584,84 @@ const CHANCE_CARDS = [
     text: 'Avanza hasta Paseo Ahumada. Si pasas por la Partida, cobra tus $200.000 CLP.',
     action: 'move_to',
     target: 21
+  },
+  {
+    title: '¡MINIJUEGO: La Bomba de Tiempo!',
+    text: '¡Desafío Mario Party! Todos los jugadores deben pasarse la bomba antes de que explote. El perdedor paga $30.000 CLP al pozo que ganan los sobrevivientes.',
+    action: 'minigame',
+    minigameId: 'bomba_tiempo',
+    poolPerPlayer: 30000
+  },
+  {
+    title: '¡MINIJUEGO: Reflejos del Metro!',
+    text: '¡Desafío Mario Party! Cuando suene el timbre y las puertas se abran, ¡presiona rápido! Quien tarde más paga $40.000 CLP.',
+    action: 'minigame',
+    minigameId: 'reflejos_metro',
+    poolPerPlayer: 40000
+  },
+  {
+    title: '¡MINIJUEGO: La Empanada Más Rápida!',
+    text: '¡Desafío Mario Party! Machaca el botón para devorar la empanada de pino antes que todos. El más lento paga $35.000 CLP.',
+    action: 'minigame',
+    minigameId: 'empanada_rapida',
+    poolPerPlayer: 35000
+  },
+  {
+    title: '¡MINIJUEGO: Ruleta de la Suerte Santiaguina!',
+    text: '¡Desafío Mario Party! Frena la ruleta en la zona dorada. Quienes caigan en la zona roja pagan $50.000 CLP al ganador.',
+    action: 'minigame',
+    minigameId: 'ruleta_santiago',
+    poolPerPlayer: 50000
+  },
+  {
+    title: '¡MINIJUEGO: Esquiva el TAG!',
+    text: '¡Desafío Mario Party! Salta en el momento justo para evitar el cobro del pórtico. Quien choque paga $40.000 CLP.',
+    action: 'minigame',
+    minigameId: 'esquiva_tag',
+    poolPerPlayer: 40000
+  },
+  {
+    title: 'Paseo en Teleférico',
+    text: 'Sube al Cerro San Cristóbal en el Teleférico. Disfrutas de la vista y cobras $50.000 CLP.',
+    action: 'collect',
+    amount: 50000
+  },
+  {
+    title: 'Templo Bahá\'í al Atardecer',
+    text: 'Avanza hasta Peñalolén. Si pasas por la Partida, cobra tus $200.000 CLP.',
+    action: 'move_to',
+    target: 34
+  },
+  {
+    title: 'Pastel de Choclo Criollo',
+    text: 'Fuiste premiado por la mejor receta típica chilena. Cobras $80.000 CLP.',
+    action: 'collect',
+    amount: 80000
+  },
+  {
+    title: 'Peaje Angostura en Fin de Semana',
+    text: 'Te pilló el taco y la tarifa alta de fin de semana largo. Paga $45.000 CLP.',
+    action: 'pay_tax',
+    amount: 45000
+  },
+  {
+    title: 'Tarjeta Bip! VIP Fiscalizadora',
+    text: '¡Quedas libre de la Comisaría! Guarda esta tarjeta o úsala para salir inmediatamente.',
+    action: 'get_out_of_jail'
+  },
+  {
+    title: '¡MINIJUEGO: Micro Llena en Hora Punta!',
+    text: '¡Desafío Mario Party! Encuentra asiento en la micro antes de que se acaben. Quien quede de pie paga $35.000 CLP.',
+    action: 'minigame',
+    minigameId: 'micro_llena',
+    poolPerPlayer: 35000
+  },
+  {
+    title: '¡MINIJUEGO: Tira la Cuerda en la Fonda!',
+    text: '¡Desafío Mario Party! Tira la cuerda machacando tu botón con toda tu fuerza. El bando o jugador perdedor paga $50.000 CLP.',
+    action: 'minigame',
+    minigameId: 'tira_cuerda',
+    poolPerPlayer: 50000
   }
 ];
 
@@ -677,6 +755,164 @@ const COMMUNITY_CARDS = [
     text: 'Obtuviste distinción máxima en la universidad. Recibes premio de $110.000 CLP.',
     action: 'collect',
     amount: 110000
+  },
+  {
+    title: 'Venta de Garage en La Reina',
+    text: 'Liquidaste tus muebles antiguos y cachureos en el jardín. Cobras $60.000 CLP.',
+    action: 'collect',
+    amount: 60000
+  },
+  {
+    title: 'Arreglo de Techumbre por Lluvias',
+    text: 'El temporal de invierno causó goteras en tu tejado. Paga $70.000 CLP por reparaciones.',
+    action: 'pay_tax',
+    amount: 70000
+  },
+  {
+    title: '¡MINIJUEGO: Lluvia de Monedas de 500!',
+    text: '¡Desafío Mario Party! Atrapa la mayor cantidad de monedas cayendo del cielo. Quien atrape menos paga $35.000 CLP a los mejores recolectores.',
+    action: 'minigame',
+    minigameId: 'lluvia_monedas',
+    poolPerPlayer: 35000
+  },
+  {
+    title: '¡MINIJUEGO: Memoria Santiaguina!',
+    text: '¡Desafío Mario Party! Memoriza y repite la secuencia de iconos patrios. El que se equivoque paga $30.000 CLP.',
+    action: 'minigame',
+    minigameId: 'memoria_santiago',
+    poolPerPlayer: 30000
+  },
+  {
+    title: '¡MINIJUEGO: Duelo del Cronómetro!',
+    text: '¡Desafío Mario Party! Detén el cronómetro lo más cerca posible de exactamente 5.000 segundos. Quien quede más lejos paga $45.000 CLP.',
+    action: 'minigame',
+    minigameId: 'duelo_cronometro',
+    poolPerPlayer: 45000
+  },
+  {
+    title: 'Tarde Familiar en el MIM',
+    text: 'Avanza hasta Gran Avenida (cerca del MIM). Si pasas por la Partida, cobra $200.000 CLP.',
+    action: 'move_to',
+    target: 13
+  },
+  {
+    title: 'Día de Campo en Pirque',
+    text: 'Disfrutaste de una cata de vinos y asado familiar. Cobras $85.000 CLP de dividendos agrícolas.',
+    action: 'collect',
+    amount: 85000
+  },
+  {
+    title: 'Tarjeta Bip! Extraviada',
+    text: 'Perdiste tu Bip! recién cargada en el Metro Los Héroes. Paga $20.000 CLP para reponerla.',
+    action: 'pay_tax',
+    amount: 20000
+  },
+  {
+    title: 'Premio al Mejor Vecino del Barrio',
+    text: 'La municipalidad te premió por cuidar las áreas verdes comunitarias. Cobras $100.000 CLP.',
+    action: 'collect',
+    amount: 100000
+  },
+  {
+    title: 'Cuota del Centro de Padres',
+    text: 'Te tocó pagar la cuota de incorporación escolar de tu hijo. Paga $30.000 CLP.',
+    action: 'pay_tax',
+    amount: 30000
+  },
+  {
+    title: 'Venta de Sopaipillas con Pebre',
+    text: 'Pusiste un carrito en día de lluvia en Providencia. Ganancia neta de $75.000 CLP.',
+    action: 'collect',
+    amount: 75000
+  },
+  {
+    title: 'Asesoría Legal Inmobiliaria',
+    text: 'Honorarios del conservador de bienes raíces por inscripción de títulos. Paga $95.000 CLP.',
+    action: 'pay_tax',
+    amount: 95000
+  },
+  {
+    title: 'Fondos Mutuos BancoEstado',
+    text: 'Tus depósitos a plazo generaron buenos intereses este trimestre. Recibes $135.000 CLP.',
+    action: 'collect',
+    amount: 135000
+  },
+  {
+    title: 'Concurso de Cueca en Quinta Normal',
+    text: 'Ganaste el 1er lugar del campeonato comunal de cueca. Cobras $60.000 CLP.',
+    action: 'collect',
+    amount: 60000
+  },
+  {
+    title: 'Inspección Sanitaria Municipal',
+    text: 'Comprobada infracción en local comercial. Ve directo a la Comisaría sin pasar por la Partida.',
+    action: 'goto_jail'
+  },
+  {
+    title: 'Beca TNE Estudiantil',
+    text: 'Aprobación de tarifa rebajada para el transporte público. Cobras $40.000 CLP de ahorro.',
+    action: 'collect',
+    amount: 40000
+  },
+  {
+    title: 'Hoyo en Américo Vespucio',
+    text: 'Caíste en un bache gigante y rompiste llanta y amortiguador. Paga $80.000 CLP de taller.',
+    action: 'pay_tax',
+    amount: 80000
+  },
+  {
+    title: 'Salvoconducto de la Comisaría',
+    text: '¡Quedas libre de la Comisaría! Guarda esta tarjeta para cuando la necesites.',
+    action: 'get_out_of_jail'
+  },
+  {
+    title: '¡MINIJUEGO: La Bomba de Tiempo!',
+    text: '¡Desafío Mario Party! Pásate la dinamita santiaguina antes del detonador. Los eliminados pagan $35.000 CLP.',
+    action: 'minigame',
+    minigameId: 'bomba_tiempo',
+    poolPerPlayer: 35000
+  },
+  {
+    title: '¡MINIJUEGO: Reflejos del Metro!',
+    text: '¡Desafío Mario Party! Reacciona veloz cuando cambie la señal a VERDE. Quien reaccione tarde paga $40.000 CLP.',
+    action: 'minigame',
+    minigameId: 'reflejos_metro',
+    poolPerPlayer: 40000
+  },
+  {
+    title: '¡MINIJUEGO: La Empanada Más Rápida!',
+    text: '¡Desafío Mario Party! Comete la empanada a toda velocidad. Los lentos pagan $30.000 CLP.',
+    action: 'minigame',
+    minigameId: 'empanada_rapida',
+    poolPerPlayer: 30000
+  },
+  {
+    title: '¡MINIJUEGO: Ruleta Santiaguina!',
+    text: '¡Desafío Mario Party! Detén la ruleta en el sector con premio. Los que fallen pagan $50.000 CLP.',
+    action: 'minigame',
+    minigameId: 'ruleta_santiago',
+    poolPerPlayer: 50000
+  },
+  {
+    title: '¡MINIJUEGO: Esquiva el TAG!',
+    text: '¡Desafío Mario Party! Salto sincronizado en la autopista. Quien no salte a tiempo paga $40.000 CLP.',
+    action: 'minigame',
+    minigameId: 'esquiva_tag',
+    poolPerPlayer: 40000
+  },
+  {
+    title: '¡MINIJUEGO: Micro Llena en Hora Punta!',
+    text: '¡Desafío Mario Party! Corre a sentarte en la micro 210. Quien quede parado paga $35.000 CLP.',
+    action: 'minigame',
+    minigameId: 'micro_llena',
+    poolPerPlayer: 35000
+  },
+  {
+    title: '¡MINIJUEGO: Tira la Cuerda en la Fonda!',
+    text: '¡Desafío Mario Party! Batalla de fuerza machacando el botón. El lado débil paga $45.000 CLP.',
+    action: 'minigame',
+    minigameId: 'tira_cuerda',
+    poolPerPlayer: 45000
   }
 ];
 

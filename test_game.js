@@ -330,6 +330,68 @@ async function runTests() {
     );
     console.log('✅ Auditoría de Marcas y Propiedad Intelectual: términos comerciales y marcas registradas saneados.');
 
+    // 12. Mazos expandidos de tarjetas (40 Lotería y 40 Aló Santiago)
+    const { CHANCE_CARDS, COMMUNITY_CARDS } = require('./boardData');
+    assert.strictEqual(CHANCE_CARDS.length, 40, 'El mazo de tarjetas ? (Aló Santiago) debe tener 40 cartas');
+    assert.strictEqual(COMMUNITY_CARDS.length, 40, 'El mazo de tarjetas de Lotería debe tener 40 cartas');
+    assert.ok(
+      CHANCE_CARDS.some((c) => c.action === 'minigame'),
+      'El mazo ? debe incluir desafíos de minijuego multijugador'
+    );
+    assert.ok(
+      COMMUNITY_CARDS.some((c) => c.action === 'minigame'),
+      'El mazo de Lotería debe incluir desafíos de minijuego multijugador'
+    );
+    console.log(`✅ Mazos de cartas expandidos verificados: ${CHANCE_CARDS.length} tarjetas "?" y ${COMMUNITY_CARDS.length} tarjetas de Lotería.`);
+
+    // 13. Verificación de los 10 Minijuegos Mario Party y transferencia de dinero
+    const {
+      MINIGAME_DEFS,
+      ALL_MINIGAME_IDS,
+      createMinigameState,
+      handleMinigameAction,
+      simulateBotMinigameActions,
+      concludeMinigame
+    } = require('./minigameManager');
+    assert.strictEqual(ALL_MINIGAME_IDS.length, 10, 'Deben existir exactamente 10 minijuegos diferentes');
+
+    // Probar inicialización de cada uno de los 10 minijuegos
+    ALL_MINIGAME_IDS.forEach((id) => {
+      const dummyRoom = {
+        players: [
+          { id: 'p1', name: 'Alvaro', money: 200000, isBot: false },
+          { id: 'p2', name: 'Bot Pedro', money: 150000, isBot: true },
+          { id: 'p3', name: 'Bot Diego', money: 120000, isBot: true }
+        ]
+      };
+      const mg = createMinigameState(dummyRoom, id, 30000);
+      assert.strictEqual(mg.id, id);
+      assert.strictEqual(mg.betAmount, 30000);
+      assert.ok(mg.players['p1'], 'Debe registrar a los jugadores participantes');
+
+      dummyRoom.minigame = mg;
+      mg.status = 'active';
+
+      // Enviar acción de jugador
+      const actRes = handleMinigameAction(dummyRoom, 'p1', { inZone: true, coins: 5, value: 8 });
+      assert.ok(actRes.ok, `La acción debe procesarse correctamente en ${id}`);
+
+      // Simular bots
+      simulateBotMinigameActions(dummyRoom);
+
+      // Concluir minijuego y liquidar dinero
+      const res = concludeMinigame(dummyRoom);
+      assert.ok(res.winners.length > 0 || res.losers.length > 0, `Debe liquidar ganadores y perdedores en ${id}`);
+    });
+    console.log('✅ Los 10 minijuegos estilo Mario Party, bots y distribución de pozos verificados.');
+
+    // 14. Verificación de 20 Canciones pegajosas en el Jukebox
+    const fs = require('fs');
+    const jukeboxContent = fs.readFileSync('./public/musicJukebox.js', 'utf8');
+    const songMatches = jukeboxContent.match(/name:\s*['"][^'"]+['"]/g) || [];
+    assert.ok(songMatches.length >= 20, `Deben existir al menos 20 canciones en el Jukebox (encontradas: ${songMatches.length})`);
+    console.log(`✅ Jukebox verificado con ${songMatches.length} canciones melódicas pegajosas.`);
+
     console.log('\n🎉 ¡TODAS LAS PRUEBAS AUTOMATIZADAS PASARON EXITOSAMENTE!');
   } finally {
     clients.forEach((c) => c.close());
