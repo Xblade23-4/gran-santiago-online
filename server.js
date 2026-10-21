@@ -916,10 +916,16 @@ io.on('connection', (socket) => {
   });
 
   // Crear sala nueva
-  socket.on('create_room', ({ playerName, avatarId, startingMoney, gameType, category, difficulty, playerId }, callback) => {
+  socket.on('create_room', ({ playerName, avatarId, avatarImageUrl, startingMoney, gameType, category, difficulty, playerId }, callback) => {
     const cleanName = (playerName || 'Santiaguino').trim().slice(0, 20) || 'Santiaguino';
     const pid = playerId || 'p_' + Math.random().toString(36).substring(2, 10);
-    const chosenAvatar = PLAYER_AVATARS.find((a) => a.id === avatarId) || PLAYER_AVATARS[0];
+    let chosenAvatar = PLAYER_AVATARS.find((a) => a.id === avatarId) || PLAYER_AVATARS[0];
+    if (avatarImageUrl && typeof avatarImageUrl === 'string' && (avatarImageUrl.startsWith('http') || avatarImageUrl.startsWith('data:image'))) {
+      chosenAvatar = {
+        ...chosenAvatar,
+        imageUrl: avatarImageUrl.trim().slice(0, 15000)
+      };
+    }
     const initCash = Number(startingMoney) || 1500000;
 
     const hostPlayer = {
@@ -1006,7 +1012,7 @@ io.on('connection', (socket) => {
   });
 
   // Unirse a sala existente (o reconectar)
-  socket.on('join_room', ({ roomCode, playerName, avatarId, playerId }, callback) => {
+  socket.on('join_room', ({ roomCode, playerName, avatarId, avatarImageUrl, playerId }, callback) => {
     const cleanCode = (roomCode || '').trim().toUpperCase();
     const room = rooms.get(cleanCode);
 
@@ -1020,6 +1026,9 @@ io.on('connection', (socket) => {
     if (existingPlayer) {
       existingPlayer.socketId = socket.id;
       existingPlayer.connected = true;
+      if (avatarImageUrl && typeof avatarImageUrl === 'string' && (avatarImageUrl.startsWith('http') || avatarImageUrl.startsWith('data:image'))) {
+        existingPlayer.avatar.imageUrl = avatarImageUrl.trim().slice(0, 15000);
+      }
       currentRoomCode = room.code;
       currentPlayerId = existingPlayer.id;
       socket.join(room.code);
@@ -1047,6 +1056,12 @@ io.on('connection', (socket) => {
     let chosenAvatar = PLAYER_AVATARS.find((a) => a.id === avatarId && !usedAvatars.has(a.id));
     if (!chosenAvatar) {
       chosenAvatar = PLAYER_AVATARS.find((a) => !usedAvatars.has(a.id)) || PLAYER_AVATARS[0];
+    }
+    if (avatarImageUrl && typeof avatarImageUrl === 'string' && (avatarImageUrl.startsWith('http') || avatarImageUrl.startsWith('data:image'))) {
+      chosenAvatar = {
+        ...chosenAvatar,
+        imageUrl: avatarImageUrl.trim().slice(0, 15000)
+      };
     }
 
     const newPlayer = {
@@ -1079,6 +1094,35 @@ io.on('connection', (socket) => {
     broadcastPublicRooms();
 
     if (callback) callback({ ok: true, roomCode: room.code, playerId: pid, state: serializeRoom(room) });
+  });
+
+  // Actualizar avatar o foto de perfil en vivo (en el lobby o partida)
+  socket.on('update_avatar', ({ avatarId, avatarImageUrl, name }, callback) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room) return;
+    const player = room.players.find((p) => p.id === currentPlayerId);
+    if (!player) return;
+
+    if (name && typeof name === 'string') {
+      player.name = name.trim().slice(0, 20) || player.name;
+    }
+    if (avatarId) {
+      const base = PLAYER_AVATARS.find((a) => a.id === avatarId);
+      if (base) {
+        player.avatar = { ...base };
+      }
+    }
+    if (avatarImageUrl && typeof avatarImageUrl === 'string' && (avatarImageUrl.startsWith('http') || avatarImageUrl.startsWith('data:image'))) {
+      player.avatar = {
+        ...player.avatar,
+        imageUrl: avatarImageUrl.trim().slice(0, 15000)
+      };
+    } else if (avatarImageUrl === null && player.avatar.imageUrl) {
+      delete player.avatar.imageUrl;
+    }
+
+    broadcastRoomState(room);
+    if (callback) callback({ ok: true });
   });
 
   // Agregar un Bot Chileno en el Lobby (para completar o probar de 2 a 8 jugadores)

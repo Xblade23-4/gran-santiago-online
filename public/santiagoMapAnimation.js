@@ -178,27 +178,43 @@
     currentMyPlayerId = myPlayerId;
   }
 
-  function setPlayerTile(playerId, playerName, playerAvatar, tileId, isMoving = false) {
+  function setPlayerTile(playerId, playerName, playerAvatar, tileId, isMoving = false, avatarImageUrl = null) {
     const pt = SANTIAGO_POINTS[tileId] || SANTIAGO_POINTS[0];
-    const existing = playerMapPositions[playerId];
+    let existing = playerMapPositions[playerId];
 
     if (!existing) {
-      playerMapPositions[playerId] = {
+      existing = {
         tileId,
         currentX: pt.x,
         currentY: pt.y,
         targetX: pt.x,
         targetY: pt.y,
         avatar: playerAvatar || '👤',
+        avatarImageUrl: avatarImageUrl || null,
+        avatarImg: null,
         name: playerName || 'Jugador',
         moving: false,
         pulse: 1.0
       };
+      if (avatarImageUrl) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = avatarImageUrl;
+        existing.avatarImg = img;
+      }
+      playerMapPositions[playerId] = existing;
       return;
     }
 
     existing.name = playerName || existing.name;
     existing.avatar = playerAvatar || existing.avatar;
+    if (avatarImageUrl && avatarImageUrl !== existing.avatarImageUrl) {
+      existing.avatarImageUrl = avatarImageUrl;
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = avatarImageUrl;
+      existing.avatarImg = img;
+    }
 
     if (existing.tileId !== tileId || isMoving) {
       existing.tileId = tileId;
@@ -687,10 +703,19 @@
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      ctx.font = '12px system-ui';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(p.avatar || '👤', currentPx, currentPy - 10);
+      if (p.avatarImg && p.avatarImg.complete && p.avatarImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(currentPx, currentPy - 10, 10, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(p.avatarImg, currentPx - 10, currentPy - 20, 20, 20);
+        ctx.restore();
+      } else {
+        ctx.font = '12px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.avatar || '👤', currentPx, currentPy - 10);
+      }
 
       ctx.fillStyle = '#2563eb';
       ctx.beginPath();

@@ -34,7 +34,12 @@ let boardMeta = {
 let myPlayerId = localStorage.getItem('gso_playerId') || ('p_' + Math.random().toString(36).substring(2, 10));
 localStorage.setItem('gso_playerId', myPlayerId);
 
-let selectedAvatarId = 'condorito';
+let customAvatarImageUrl = localStorage.getItem('gso_custom_avatar_url') || null;
+let customAuthProvider = localStorage.getItem('gso_custom_auth_provider') || null;
+let customUserName = localStorage.getItem('gso_custom_user_name') || null;
+let activeSocialModalTarget = 'google';
+
+let selectedAvatarId = customAvatarImageUrl ? 'custom_avatar' : 'condorito';
 let selectedGameType = 'santiago';
 let currentRoomState = null;
 let myPenaltyUntil = 0;
@@ -467,19 +472,25 @@ function renderTokensOnBoard(state) {
     if (p.bankrupt) return;
     const pos = displayedPositions[p.id] !== undefined ? displayedPositions[p.id] : p.position;
     if (window.SantiagoMapAnimation && !walkingTimers[p.id]) {
-      window.SantiagoMapAnimation.setPlayerTile(p.id, p.name, p.avatar?.icon, pos, false);
+      window.SantiagoMapAnimation.setPlayerTile(p.id, p.name, p.avatar?.icon, pos, false, p.avatar?.imageUrl);
     }
     const tokenContainer = document.getElementById(`tokens-tile-${pos}`);
     if (tokenContainer) {
       const tok = document.createElement('div');
       const isMe = p.id === myPlayerId;
       const isHopping = hoppingPlayers.has(p.id);
+      const hasPhoto = Boolean(p.avatar?.imageUrl);
       tok.className = 'board-token' +
         (isMe ? ' is-me-token' : '') +
-        (isHopping ? ' token-hopping' : '');
+        (isHopping ? ' token-hopping' : '') +
+        (hasPhoto ? ' has-photo' : '');
       tok.style.borderColor = p.avatar.color;
       tok.title = `${p.name} (${formatCLP(p.money)})`;
-      tok.textContent = p.avatar.icon;
+      if (hasPhoto) {
+        tok.innerHTML = `<img src="${p.avatar.imageUrl}" alt="${p.name}" class="token-photo-img" />`;
+      } else {
+        tok.textContent = p.avatar.icon;
+      }
       tokenContainer.appendChild(tok);
     }
   });
@@ -500,7 +511,7 @@ function animatePlayerMovement(player, fromPos, toPos) {
     displayedPositions[player.id] = toPos;
     renderTokensOnBoard(currentRoomState);
     if (window.SantiagoMapAnimation) {
-      window.SantiagoMapAnimation.setPlayerTile(player.id, player.name, player.avatar?.icon, toPos, false);
+      window.SantiagoMapAnimation.setPlayerTile(player.id, player.name, player.avatar?.icon, toPos, false, player.avatar?.imageUrl);
     }
     return;
   }
@@ -540,7 +551,7 @@ function animatePlayerMovement(player, fromPos, toPos) {
         updateTurnActionControls(currentRoomState);
       }
       if (window.SantiagoMapAnimation) {
-        window.SantiagoMapAnimation.setPlayerTile(player.id, player.name, player.avatar?.icon, toPos, false);
+        window.SantiagoMapAnimation.setPlayerTile(player.id, player.name, player.avatar?.icon, toPos, false, player.avatar?.imageUrl);
       }
       return;
     }
@@ -549,7 +560,7 @@ function animatePlayerMovement(player, fromPos, toPos) {
     displayedPositions[player.id] = nextTileId;
     hoppingPlayers.add(player.id);
     if (window.SantiagoMapAnimation) {
-      window.SantiagoMapAnimation.setPlayerTile(player.id, player.name, player.avatar?.icon, nextTileId, true);
+      window.SantiagoMapAnimation.setPlayerTile(player.id, player.name, player.avatar?.icon, nextTileId, true, player.avatar?.imageUrl);
     }
 
     // Sonido por cada cuadro avanzado
@@ -616,7 +627,11 @@ function triggerTurnChangeAnimation(player, isMyTurn) {
   if (!overlay || !card || !player) return;
 
   card.style.borderTopColor = player.avatar?.color || '#2563eb';
-  avatarEl.textContent = player.avatar?.icon || '🎲';
+  if (player.avatar?.imageUrl) {
+    avatarEl.innerHTML = `<img src="${player.avatar.imageUrl}" alt="${player.name}" class="tt-avatar-img" />`;
+  } else {
+    avatarEl.textContent = player.avatar?.icon || '🎲';
+  }
   nameEl.textContent = isMyTurn ? `¡Es tu turno, ${player.name}!` : `Turno de ${player.name}`;
   subEl.textContent = isMyTurn
     ? '¡Lanza los dados y conquista las comunas de Santiago!'
@@ -693,11 +708,331 @@ const GAME_META_LABELS = {
   pictionary: { title: '🎨 Doodle Party', short: 'Doodle Party', icon: '🎨' }
 };
 
+function parseJwt(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
+
+function applySocialProfile({ name, imageUrl, provider }) {
+  if (!imageUrl) return;
+  customAvatarImageUrl = imageUrl;
+  customAuthProvider = provider || 'social';
+  if (name) customUserName = name;
+  selectedAvatarId = 'custom_avatar';
+
+  localStorage.setItem('gso_custom_avatar_url', customAvatarImageUrl);
+  localStorage.setItem('gso_custom_auth_provider', customAuthProvider);
+  if (name) localStorage.setItem('gso_custom_user_name', name);
+
+  updateSocialCardUI();
+  renderAvatarSelector();
+
+  // Si el input de nombre está vacío o por defecto, rellenarlo con el nombre de la cuenta
+  const nameInput = document.getElementById('input-player-name');
+  if (nameInput && name && (!nameInput.value || nameInput.value === 'Santiaguino' || nameInput.value === 'Inversionista')) {
+    nameInput.value = name;
+    localStorage.setItem('gso_playerName', name);
+  }
+
+  // Si ya está en una sala, notificar al servidor para actualizar en vivo a todos
+  if (currentRoomCode) {
+    socket.emit('update_avatar', { avatarId: 'custom_avatar', avatarImageUrl: customAvatarImageUrl, name });
+  }
+
+  // Cerrar diálogo si estaba abierto
+  const dialog = document.getElementById('social-auth-dialog');
+  if (dialog && dialog.open) {
+    dialog.close();
+  }
+  showToast(`✅ Foto de perfil de ${provider.toUpperCase()} activada con éxito`);
+}
+
+function updateSocialCardUI() {
+  const card = document.getElementById('social-connected-card');
+  const img = document.getElementById('scc-avatar-img');
+  const badge = document.getElementById('scc-provider-badge');
+  const nameEl = document.getElementById('scc-user-name');
+  const descEl = document.getElementById('scc-provider-desc');
+
+  if (!card) return;
+
+  if (customAvatarImageUrl) {
+    card.classList.remove('hidden');
+    if (img) img.src = customAvatarImageUrl;
+    const providerLabels = {
+      google: { badge: 'G', label: 'Cuenta de Google', color: '#ea4335' },
+      facebook: { badge: 'f', label: 'Cuenta de Facebook', color: '#1877F2' },
+      instagram: { badge: '📷', label: 'Cuenta de Instagram', color: '#e1306c' },
+      custom: { badge: '📁', label: 'Foto personalizada', color: '#0284c7' }
+    };
+    const pInfo = providerLabels[customAuthProvider] || providerLabels.custom;
+    if (badge) {
+      badge.textContent = pInfo.badge;
+      badge.style.backgroundColor = pInfo.color;
+    }
+    if (nameEl) nameEl.textContent = customUserName || 'Usuario';
+    if (descEl) descEl.textContent = pInfo.label;
+  } else {
+    card.classList.add('hidden');
+  }
+}
+
+function openSocialModal(provider) {
+  activeSocialModalTarget = provider;
+  const dialog = document.getElementById('social-auth-dialog');
+  const title = document.getElementById('social-dialog-title');
+  const desc = document.getElementById('social-dialog-desc');
+  const demoTitle = document.getElementById('sob-demo-title');
+  const demoSub = document.getElementById('sob-demo-sub');
+  const demoIcon = document.getElementById('sob-demo-icon');
+
+  const configs = {
+    google: {
+      title: '🔴 Conectar con Google',
+      desc: 'Importa tu foto de perfil de Google para usarla como tu ficha en el tablero:',
+      demoTitle: 'Usar perfil demo verificado de Google',
+      demoSub: 'Simula inicio de sesión oficial con foto real de Google',
+      icon: '🔴'
+    },
+    facebook: {
+      title: '🔵 Conectar con Facebook',
+      desc: 'Importa tu foto de perfil de Facebook para usarla como tu ficha en el tablero:',
+      demoTitle: 'Usar perfil demo verificado de Facebook',
+      demoSub: 'Simula inicio de sesión oficial con foto real de Facebook',
+      icon: '🔵'
+    },
+    instagram: {
+      title: '📸 Conectar con Instagram',
+      desc: 'Importa tu foto de perfil de Instagram para usarla como tu ficha en el tablero:',
+      demoTitle: 'Usar perfil demo verificado de Instagram',
+      demoSub: 'Simula conexión con cuenta de Instagram y foto de perfil',
+      icon: '📸'
+    },
+    upload: {
+      title: '📁 Cargar Foto de Perfil',
+      desc: 'Sube una imagen o pega una URL directa para usarla como ficha:',
+      demoTitle: 'Usar foto de avatar destacada',
+      demoSub: 'Foto de alta resolución para el juego',
+      icon: '⭐'
+    }
+  };
+
+  const cfg = configs[provider] || configs.google;
+  if (title) title.textContent = cfg.title;
+  if (desc) desc.textContent = cfg.desc;
+  if (demoTitle) demoTitle.textContent = cfg.demoTitle;
+  if (demoSub) demoSub.textContent = cfg.demoSub;
+  if (demoIcon) demoIcon.textContent = cfg.icon;
+
+  if (dialog && !dialog.open) {
+    dialog.showModal();
+  }
+}
+
+function initSocialAuth() {
+  updateSocialCardUI();
+
+  // 1. Google Identity Services (GIS)
+  window.handleGoogleCredentialResponse = function(response) {
+    if (response && response.credential) {
+      const payload = parseJwt(response.credential);
+      if (payload && payload.picture) {
+        applySocialProfile({
+          name: payload.name || payload.given_name || 'Usuario Google',
+          imageUrl: payload.picture,
+          provider: 'google'
+        });
+      }
+    }
+  };
+
+  if (window.google?.accounts?.id) {
+    try {
+      window.google.accounts.id.initialize({
+        client_id: '1058293847291-exampledemo.apps.googleusercontent.com',
+        callback: window.handleGoogleCredentialResponse,
+        auto_select: false
+      });
+    } catch (e) {
+      console.warn('Google GIS notice:', e);
+    }
+  }
+
+  // 2. Facebook SDK
+  window.fbAsyncInit = function() {
+    if (window.FB) {
+      window.FB.init({
+        appId: '102938475612345',
+        cookie: true,
+        xfbml: true,
+        version: 'v19.0'
+      });
+    }
+  };
+
+  // Botones de inicio de sesión social
+  document.getElementById('btn-login-google')?.addEventListener('click', () => {
+    if (window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            openSocialModal('google');
+          }
+        });
+        return;
+      } catch (err) {
+        // Fallback a modal
+      }
+    }
+    openSocialModal('google');
+  });
+
+  document.getElementById('btn-login-facebook')?.addEventListener('click', () => {
+    if (window.FB) {
+      try {
+        window.FB.login((response) => {
+          if (response.authResponse) {
+            window.FB.api('/me', { fields: 'name,picture.width(200).height(200)' }, (userData) => {
+              if (userData && userData.picture?.data?.url) {
+                applySocialProfile({
+                  name: userData.name || 'Usuario Facebook',
+                  imageUrl: userData.picture.data.url,
+                  provider: 'facebook'
+                });
+              }
+            });
+            return;
+          }
+          openSocialModal('facebook');
+        }, { scope: 'public_profile' });
+        return;
+      } catch (err) {
+        // Fallback a modal
+      }
+    }
+    openSocialModal('facebook');
+  });
+
+  document.getElementById('btn-login-instagram')?.addEventListener('click', () => {
+    openSocialModal('instagram');
+  });
+
+  document.getElementById('btn-upload-photo')?.addEventListener('click', () => {
+    document.getElementById('social-file-input')?.click();
+  });
+
+  document.getElementById('btn-social-disconnect')?.addEventListener('click', () => {
+    customAvatarImageUrl = null;
+    customAuthProvider = null;
+    customUserName = null;
+    selectedAvatarId = boardMeta.PLAYER_AVATARS[0]?.id || 'condorito';
+
+    localStorage.removeItem('gso_custom_avatar_url');
+    localStorage.removeItem('gso_custom_auth_provider');
+    localStorage.removeItem('gso_custom_user_name');
+
+    updateSocialCardUI();
+    renderAvatarSelector();
+
+    if (currentRoomCode) {
+      socket.emit('update_avatar', { avatarId: selectedAvatarId, avatarImageUrl: null });
+    }
+    showToast('Foto de perfil desconectada. Usando ficha chilena estándar.');
+  });
+
+  // Modal de opciones sociales
+  document.getElementById('btn-close-social-dialog')?.addEventListener('click', () => {
+    document.getElementById('social-auth-dialog')?.close();
+  });
+
+  document.getElementById('btn-social-opt-demo')?.addEventListener('click', () => {
+    const demoProfiles = {
+      google: {
+        name: 'Alex Google',
+        imageUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+        provider: 'google'
+      },
+      facebook: {
+        name: 'Camila Facebook',
+        imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
+        provider: 'facebook'
+      },
+      instagram: {
+        name: 'Ignacio Instagram',
+        imageUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=200&auto=format&fit=crop&q=80',
+        provider: 'instagram'
+      },
+      upload: {
+        name: 'Jugador VIP',
+        imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+        provider: 'custom'
+      }
+    };
+    const prof = demoProfiles[activeSocialModalTarget] || demoProfiles.google;
+    applySocialProfile(prof);
+  });
+
+  document.getElementById('btn-apply-avatar-url')?.addEventListener('click', () => {
+    const input = document.getElementById('input-social-avatar-url');
+    const url = input?.value.trim();
+    if (!url || !url.startsWith('http')) {
+      showToast('Ingresa una URL válida que empiece con http:// o https://');
+      return;
+    }
+    applySocialProfile({
+      name: null,
+      imageUrl: url,
+      provider: activeSocialModalTarget || 'custom'
+    });
+    if (input) input.value = '';
+  });
+
+  document.getElementById('btn-social-opt-upload')?.addEventListener('click', () => {
+    document.getElementById('social-file-input')?.click();
+  });
+
+  document.getElementById('social-file-input')?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('La imagen debe pesar menos de 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result;
+      if (dataUrl) {
+        applySocialProfile({
+          name: null,
+          imageUrl: dataUrl,
+          provider: 'custom'
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+}
+
 // Inicialización al cargar la página
 async function initApp() {
   setupDialogLightDismiss(document.getElementById('property-dialog'));
   setupDialogLightDismiss(document.getElementById('trade-dialog'));
   setupDialogLightDismiss(document.getElementById('drawn-card-dialog'));
+  setupDialogLightDismiss(document.getElementById('social-auth-dialog'));
+
+  initSocialAuth();
 
   // Vincular eventos inmediatamente para que Crear Sala y Entrar funcionen sin demora
   bindUIEvents();
@@ -731,8 +1066,29 @@ async function initApp() {
 function renderAvatarSelector() {
   const container = document.getElementById('avatar-selector');
   container.innerHTML = '';
+
+  // Si el usuario tiene una foto de perfil personalizada (Google, Facebook, Instagram o archivo)
+  if (customAvatarImageUrl) {
+    const isCustomSelected = selectedAvatarId === 'custom_avatar';
+    const customDiv = document.createElement('div');
+    customDiv.className = 'avatar-option avatar-photo-opt' + (isCustomSelected ? ' selected' : '');
+    customDiv.innerHTML = `
+      <div class="av-photo-wrap">
+        <img src="${customAvatarImageUrl}" alt="Mi Foto" class="av-photo-img" />
+        <span class="av-photo-badge">⭐</span>
+      </div>
+      <span class="av-name">Mi Foto</span>
+    `;
+    customDiv.addEventListener('click', () => {
+      selectedAvatarId = 'custom_avatar';
+      document.querySelectorAll('.avatar-option').forEach((el) => el.classList.remove('selected'));
+      customDiv.classList.add('selected');
+    });
+    container.appendChild(customDiv);
+  }
+
   boardMeta.PLAYER_AVATARS.forEach((av, idx) => {
-    if (idx === 0) selectedAvatarId = av.id;
+    if (!customAvatarImageUrl && idx === 0 && !selectedAvatarId) selectedAvatarId = av.id;
     const div = document.createElement('div');
     div.className = 'avatar-option' + (av.id === selectedAvatarId ? ' selected' : '');
     div.innerHTML = `
@@ -917,9 +1273,11 @@ function bindUIEvents() {
     const startingMoney = Number(document.getElementById('select-starting-money').value) || 1500000;
     localStorage.setItem('gso_playerName', playerName);
 
+    const activePhotoUrl = (selectedAvatarId === 'custom_avatar' || customAvatarImageUrl) ? customAvatarImageUrl : null;
+
     socket.emit(
       'create_room',
-      { playerName, avatarId: selectedAvatarId, startingMoney, gameType: selectedGameType, playerId: myPlayerId },
+      { playerName, avatarId: selectedAvatarId, avatarImageUrl: activePhotoUrl, startingMoney, gameType: selectedGameType, playerId: myPlayerId },
       (res) => {
         if (res && res.ok) {
           if (res.state) {
@@ -1240,9 +1598,11 @@ function joinRoomByCode(roomCode) {
   const playerName = document.getElementById('input-player-name').value.trim() || 'Inversionista';
   localStorage.setItem('gso_playerName', playerName);
 
+  const activePhotoUrl = (selectedAvatarId === 'custom_avatar' || customAvatarImageUrl) ? customAvatarImageUrl : null;
+
   socket.emit(
     'join_room',
-    { roomCode, playerName, avatarId: selectedAvatarId, playerId: myPlayerId },
+    { roomCode, playerName, avatarId: selectedAvatarId, avatarImageUrl: activePhotoUrl, playerId: myPlayerId },
     (res) => {
       if (res && res.ok) {
         if (res.state) {
@@ -1774,7 +2134,10 @@ function renderLobby(state) {
       votersForGame.forEach((vp) => {
         const chip = document.createElement('span');
         chip.className = 'voter-chip';
-        chip.textContent = `${vp.avatar?.icon || '👤'} ${vp.name}`;
+        const avChip = vp.avatar?.imageUrl
+          ? `<img src="${vp.avatar.imageUrl}" class="chip-avatar-img" />`
+          : (vp.avatar?.icon || '👤');
+        chip.innerHTML = `${avChip} ${vp.name}`;
         votersEl.appendChild(chip);
       });
     }
@@ -1837,8 +2200,11 @@ function renderLobby(state) {
     const card = document.createElement('div');
     card.className = 'lobby-player-card';
     card.style.borderColor = p.avatar.color;
+    const avLobbyDisplay = p.avatar?.imageUrl
+      ? `<img src="${p.avatar.imageUrl}" alt="${p.name}" class="lp-avatar-img" />`
+      : p.avatar.icon;
     card.innerHTML = `
-      <span class="lp-icon">${p.avatar.icon}</span>
+      <span class="lp-icon">${avLobbyDisplay}</span>
       <div>
         <div class="lp-name">${p.name} ${p.id === myPlayerId ? '(Tú)' : ''}</div>
         <div class="lp-role">${p.id === state.hostId ? '👑 Anfitrión' : (p.isBot ? '🤖 Bot Automático' : '🟢 Conectado')} • Vota: ${pVoteMeta.icon}</div>
@@ -1991,9 +2357,12 @@ function renderGame(state) {
     row.style.borderLeftColor = p.avatar.color;
 
     const tileName = boardMeta.BOARD_TILES[p.position]?.shortName || boardMeta.BOARD_TILES[p.position]?.name || '';
+    const avRowDisplay = p.avatar?.imageUrl
+      ? `<img src="${p.avatar.imageUrl}" alt="${p.name}" class="avatar-photo-img" />`
+      : p.avatar.icon;
     row.innerHTML = `
       <div class="p-info">
-        <span class="p-avatar">${p.avatar.icon}</span>
+        <span class="p-avatar">${avRowDisplay}</span>
         <div>
           <div class="p-name">${p.name} ${p.id === myPlayerId ? '(Tú)' : ''}</div>
           <span class="p-status-tag">${p.bankrupt ? '💥 En Bancarrota' : (p.inJail ? '🚓 En Comisaría' : `📍 ${tileName}`)}</span>
@@ -2291,9 +2660,12 @@ function renderCualEsTableSeats(state) {
     seat.id = `cuales-seat-${p.id}`;
     seat.className = `cuales-seat ${posClass}` + (isPenalized ? ' seat-penalized' : '');
     seat.style.borderColor = p.avatar?.color || '#38bdf8';
+    const pAvDisplay = p.avatar?.imageUrl
+      ? `<img src="${p.avatar.imageUrl}" alt="${p.name}" class="seat-avatar-img" />`
+      : (p.avatar?.icon || '👤');
     seat.innerHTML = `
       <span class="cuales-seat-hand">${isPenalized ? '❄️' : '🫳'}</span>
-      <span class="cuales-seat-avatar">${p.avatar?.icon || '👤'}</span>
+      <span class="cuales-seat-avatar">${pAvDisplay}</span>
       <div class="cuales-seat-info">
         <span class="cuales-seat-name">${p.name}</span>
         <span class="cuales-seat-score">${pScore} 🃏</span>
@@ -2305,13 +2677,16 @@ function renderCualEsTableSeats(state) {
   if (me) {
     const isMePenalized = (ce.penalties?.[me.id] || 0) > Date.now();
     const myScore = ce.scores?.[me.id] || 1;
+    const myAvDisplay = me.avatar?.imageUrl
+      ? `<img src="${me.avatar.imageUrl}" alt="${me.name}" class="seat-avatar-img" />`
+      : (me.avatar?.icon || '👤');
     const mySeat = document.createElement('div');
     mySeat.id = `cuales-seat-${me.id}`;
     mySeat.className = `cuales-seat pos-bottom` + (isMePenalized ? ' seat-penalized' : '');
     mySeat.style.borderColor = me.avatar?.color || '#38bdf8';
     mySeat.innerHTML = `
       <span class="cuales-seat-hand">${isMePenalized ? '❄️' : '🖐️'}</span>
-      <span class="cuales-seat-avatar">${me.avatar?.icon || '👤'}</span>
+      <span class="cuales-seat-avatar">${myAvDisplay}</span>
       <div class="cuales-seat-info">
         <span class="cuales-seat-name">${me.name} (Tú)</span>
         <span class="cuales-seat-score">${myScore} 🃏</span>

@@ -50,6 +50,15 @@ async function runTests() {
     assert.strictEqual(room.players.length, 8, 'La sala debe tener exactamente 8 jugadores');
     console.log('✅ Soporte de 8 jugadores simultáneos verificado.');
 
+    // 2b. Verificar vinculación de foto de perfil social (Google / Facebook / Instagram)
+    const p1AvatarImg = 'https://lh3.googleusercontent.com/a/test-google-photo.jpg';
+    const updateAvRes = await new Promise((r) =>
+      host.emit('update_avatar', { avatarImageUrl: p1AvatarImg }, r)
+    );
+    assert.strictEqual(updateAvRes.ok, true, 'Debe actualizar foto de perfil');
+    assert.strictEqual(room.players[0].avatar.imageUrl, p1AvatarImg, 'El avatar del jugador debe tener la foto de perfil');
+    console.log('✅ Foto de perfil de cuenta social (Google / Facebook / Instagram) vinculada correctamente.');
+
     // 3. Verificar que un 9no jugador sea rechazado
     const extraClient = createClient();
     await new Promise((r) => extraClient.on('connect', r));
