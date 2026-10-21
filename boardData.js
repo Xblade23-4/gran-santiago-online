@@ -17,7 +17,7 @@ const COLOR_GROUPS = {
 };
 
 const PLAYER_AVATARS = [
-  { id: 'condorito', icon: '🦅', name: 'Cóndor Andino', color: '#EF4444' },
+  { id: 'condor',    icon: '🦅', name: 'Cóndor Andino', color: '#EF4444' },
   { id: 'metro',     icon: '🚇', name: 'Tren Metro',    color: '#3B82F6' },
   { id: 'moai',      icon: '🗿', name: 'Moai',          color: '#10B981' },
   { id: 'empanada',  icon: '🥟', name: 'Empanada de Pino', color: '#F59E0B' },
@@ -48,11 +48,11 @@ const BOARD_TILES = [
   },
   {
     id: 2,
-    name: 'Polla Chilena de Beneficencia',
-    shortName: 'Polla Chilena',
+    name: 'Lotería de Beneficencia',
+    shortName: 'Lotería',
     type: 'community',
     icon: '🍀',
-    description: 'Saca una tarjeta de la Polla Chilena de Beneficencia.'
+    description: 'Saca una tarjeta de la Lotería de Beneficencia.'
   },
   {
     id: 3,
@@ -142,7 +142,8 @@ const BOARD_TILES = [
   },
   {
     id: 12,
-    name: 'Enel Distribución (Luz)',
+    name: 'Compañía Eléctrica Central (Luz)',
+    shortName: 'Luz Central',
     comuna: 'Servicio Eléctrico',
     type: 'utility',
     group: 'utility',
@@ -193,11 +194,11 @@ const BOARD_TILES = [
   },
   {
     id: 17,
-    name: 'Polla Chilena de Beneficencia',
-    shortName: 'Polla Chilena',
+    name: 'Lotería de Beneficencia',
+    shortName: 'Lotería',
     type: 'community',
     icon: '🍀',
-    description: 'Saca una tarjeta de la Polla Chilena de Beneficencia.'
+    description: 'Saca una tarjeta de la Lotería de Beneficencia.'
   },
   {
     id: 18,
@@ -298,7 +299,8 @@ const BOARD_TILES = [
   },
   {
     id: 28,
-    name: 'Aguas Andinas (Agua Potable)',
+    name: 'Aguas del Valle Central (Agua Potable)',
+    shortName: 'Agua Potable',
     comuna: 'Servicio Sanitario',
     type: 'utility',
     group: 'utility',
@@ -347,11 +349,11 @@ const BOARD_TILES = [
   },
   {
     id: 33,
-    name: 'Polla Chilena de Beneficencia',
-    shortName: 'Polla Chilena',
+    name: 'Lotería de Beneficencia',
+    shortName: 'Lotería',
     type: 'community',
     icon: '🍀',
-    description: 'Saca una tarjeta de la Polla Chilena de Beneficencia.'
+    description: 'Saca una tarjeta de la Lotería de Beneficencia.'
   },
   {
     id: 34,
@@ -421,7 +423,7 @@ const CHANCE_CARDS = [
     target: 0
   },
   {
-    title: 'Negocio en el Costanera Center',
+    title: 'Negocio en Sanhattan (Torre Costanera)',
     text: 'Avanza hasta Sanhattan (Torre Costanera). Si está libre puedes comprarla; si tiene dueño, paga el arriendo.',
     action: 'move_to',
     target: 39
@@ -517,14 +519,14 @@ const CHANCE_CARDS = [
     amount: 90000
   },
   {
-    title: 'Alza en la Cuenta de la Luz (Enel)',
+    title: 'Alza en la Cuenta de la Luz',
     text: 'Subieron las tarifas eléctricas de invierno. Paga $55.000 CLP al pozo.',
     action: 'pay_tax',
     amount: 55000
   },
   {
     title: 'Corte de Agua en tu Comuna',
-    text: 'Aguas Andinas te indemnizó por el corte programado del fin de semana. Recibes $65.000 CLP.',
+    text: 'La empresa sanitaria te indemnizó por el corte programado del fin de semana. Recibes $65.000 CLP.',
     action: 'collect',
     amount: 65000
   },
@@ -587,14 +589,14 @@ const CHANCE_CARDS = [
 
 const COMMUNITY_CARDS = [
   {
-    title: '¡Ganaste el Kino!',
-    text: 'Le achuntaste a los 14 números en el sorteo dominical. Cobras $200.000 CLP.',
+    title: '¡Gran Pozo de la Lotería!',
+    text: 'Le achuntaste a todos los números en el sorteo dominical. Cobras $200.000 CLP.',
     action: 'collect',
     amount: 200000
   },
   {
     title: '¡La Hora de tu Suerte!',
-    text: 'Tu número de RUT salió premiado en Polla Chilena de Beneficencia. Cobras $120.000 CLP.',
+    text: 'Tu número de RUT salió premiado en la Lotería de Beneficencia. Cobras $120.000 CLP.',
     action: 'collect',
     amount: 120000
   },

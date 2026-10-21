@@ -166,7 +166,7 @@
           </div>
 
           <div class="form-group" id="group-starting-money">
-            <label for="select-starting-money">Capital Inicial BancoEstado ($ CLP)</label>
+            <label for="select-starting-money">Capital Inicial ($ CLP)</label>
             <select id="select-starting-money">
               <option value="1500000" selected>$1.500.000 CLP (Estándar Oficial)</option>
               <option value="2000000">$2.000.000 CLP (Capital Abundante)</option>
@@ -247,7 +247,7 @@
                   <span class="lvc-badge" id="vote-badge-santiago">1 voto</span>
                 </div>
                 <div class="lvc-title">Gran Santiago Online</div>
-                <div class="lvc-desc">Monopoly chileno en $ CLP, comunas y Metro</div>
+                <div class="lvc-desc">Juego de mesa inmobiliario en $ CLP, comunas y Metro</div>
                 <div class="lvc-voters" id="voters-santiago"></div>
               </button>
 
@@ -280,6 +280,16 @@
                 <div class="lvc-desc">Dibuja y adivina palabras en tiempo real</div>
                 <div class="lvc-voters" id="voters-pictionary"></div>
               </button>
+
+              <button type="button" class="lobby-vote-card" data-game="sudoku" id="vote-card-sudoku">
+                <div class="lvc-top">
+                  <span class="lvc-icon">🔢</span>
+                  <span class="lvc-badge" id="vote-badge-sudoku">0 votos</span>
+                </div>
+                <div class="lvc-title">Sudoku Colaborativo</div>
+                <div class="lvc-desc">El líder define los números y el equipo sugiere notas</div>
+                <div class="lvc-voters" id="voters-sudoku"></div>
+              </button>
             </div>
 
             <!-- Ajustes específicos del juego ganador (visibles para el anfitrión) -->
@@ -290,6 +300,15 @@
                   <option value="1500000">$1.500.000 CLP (Estándar)</option>
                   <option value="2000000">$2.000.000 CLP (Abundante)</option>
                   <option value="1000000">$1.000.000 CLP (Rápido)</option>
+                </select>
+              </div>
+              <div id="lobby-sudoku-setting-wrap" class="lobby-setting-item hidden">
+                <label for="lobby-select-sudoku-diff">🧩 Dificultad Sudoku:</label>
+                <select id="lobby-select-sudoku-diff">
+                  <option value="facil">🟢 Fácil (Pistas abundantes)</option>
+                  <option value="medio">🟡 Medio (Equilibrado)</option>
+                  <option value="dificil">🔴 Difícil (Desafío mental)</option>
+                  <option value="custom">⚪ En Blanco (Líder ingresa números)</option>
                 </select>
               </div>
               <div id="lobby-party-setting-wrap" class="lobby-setting-item hidden">
@@ -494,6 +513,93 @@
           </div>
         </div>
 
+        <!-- ARENA DEL JUEGO SUDOKU COLABORATIVO -->
+        <div id="sudoku-arena" class="sudoku-arena hidden">
+          <div class="sudoku-top-header">
+            <div class="sudoku-title-box">
+              <span class="sudoku-badge-icon">🔢</span>
+              <div>
+                <h2 class="sudoku-title">Sudoku Colaborativo</h2>
+                <div class="sudoku-subtitle" id="sudoku-role-hint">
+                  👑 Líder: Ingresa números definitivos | 💡 Colaboradores: Aportan notas y sugerencias
+                </div>
+              </div>
+            </div>
+
+            <div class="sudoku-header-actions">
+              <div class="sudoku-stat-pill" id="sudoku-progress-pill">
+                <span>Completadas:</span> <strong id="sudoku-stat-filled">0</strong>/81
+              </div>
+              <button type="button" id="btn-sudoku-vote-abandon" class="btn btn-danger-outline btn-xs">
+                🏳️ Votar Abandonar (0/1)
+              </button>
+            </div>
+          </div>
+
+          <!-- Barra de herramientas del líder (solo visible para el anfitrión) -->
+          <div id="sudoku-leader-toolbar" class="sudoku-leader-toolbar">
+            <span class="slt-label">👑 Controles de Líder:</span>
+            <div class="slt-group">
+              <label for="sudoku-preset-select">Dificultad:</label>
+              <select id="sudoku-preset-select" class="sudoku-select-sm">
+                <option value="facil">Fácil</option>
+                <option value="medio">Medio</option>
+                <option value="dificil">Difícil</option>
+                <option value="custom">En Blanco</option>
+              </select>
+              <button type="button" id="btn-sudoku-load-preset" class="btn btn-secondary btn-xs">🔄 Cargar</button>
+            </div>
+            <button type="button" id="btn-sudoku-validate" class="btn btn-info btn-xs">✔️ Validar Tablero</button>
+            <button type="button" id="btn-sudoku-clear-all" class="btn btn-ghost btn-xs">🧹 Limpiar Todo</button>
+          </div>
+
+          <!-- Tablero Sudoku 9x9 -->
+          <div class="sudoku-board-container">
+            <div id="sudoku-grid" class="sudoku-grid">
+              <!-- 81 celdas renderizadas dinámicamente -->
+            </div>
+          </div>
+
+          <!-- Panel de Teclado Numérico y Sugerencias -->
+          <div class="sudoku-keypad-panel">
+            <div class="skp-header">
+              <div class="skp-title" id="sudoku-keypad-title">
+                👆 Selecciona una casilla para jugar
+              </div>
+              <div id="sudoku-selected-cell-info" class="skp-cell-info"></div>
+            </div>
+            <div class="skp-keys" id="sudoku-keys-container">
+              <button type="button" class="skp-btn" data-num="1">1</button>
+              <button type="button" class="skp-btn" data-num="2">2</button>
+              <button type="button" class="skp-btn" data-num="3">3</button>
+              <button type="button" class="skp-btn" data-num="4">4</button>
+              <button type="button" class="skp-btn" data-num="5">5</button>
+              <button type="button" class="skp-btn" data-num="6">6</button>
+              <button type="button" class="skp-btn" data-num="7">7</button>
+              <button type="button" class="skp-btn" data-num="8">8</button>
+              <button type="button" class="skp-btn" data-num="9">9</button>
+              <button type="button" class="skp-btn skp-btn-clear" id="btn-sudoku-key-clear">⌫ Borrar</button>
+            </div>
+            <!-- Sugerencias en la casilla seleccionada para que el líder pueda aceptarlas directamente -->
+            <div id="sudoku-cell-suggestions-bar" class="sudoku-cell-suggestions-bar hidden">
+              <span class="scsb-title">💡 Sugerencias del equipo:</span>
+              <div id="sudoku-cell-suggestions-list" class="scsb-list"></div>
+            </div>
+          </div>
+
+          <!-- Overlay de Victoria de Sudoku -->
+          <div id="sudoku-victory-overlay" class="sudoku-victory-overlay hidden">
+            <div class="sudoku-victory-card">
+              <div class="svc-icon">🎉🏆</div>
+              <h2 class="svc-title">¡SUDOKU RESUELTO!</h2>
+              <p class="svc-desc">¡Gran trabajo en equipo! Resolvieron las 81 casillas correctamente.</p>
+              <button type="button" id="btn-sudoku-finish-return" class="btn btn-primary btn-md">
+                🔄 Terminar y Volver a la Sala
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div id="board-grid" class="board-grid">
           <!-- El centro del tablero (filas 2..10, columnas 2..10) -->
           <div class="board-center">
@@ -634,7 +740,7 @@
         <div id="prop-owner-actions" class="prop-owner-actions hidden">
           <button id="btn-build-house" class="btn btn-success btn-sm">🏗️ Construir Casa / Torre</button>
           <button id="btn-sell-house" class="btn btn-warning btn-sm">🔨 Vender Edificación</button>
-          <button id="btn-toggle-mortgage" class="btn btn-secondary btn-sm">🏦 Hipotecar en BancoEstado</button>
+          <button id="btn-toggle-mortgage" class="btn btn-secondary btn-sm">🏦 Hipotecar en el Banco</button>
         </div>
       </div>
       <div class="dialog-footer">
@@ -686,7 +792,7 @@
     </div>
   </dialog>
 
-  <!-- ================= MODAL NATIVO: TARJETA SACADA (¡ALÓ SANTIAGO! / POLLA CHILENA) ================= -->
+  <!-- ================= MODAL NATIVO: TARJETA SACADA (¡ALÓ SANTIAGO! / LOTERÍA) ================= -->
   <dialog id="drawn-card-dialog" closedby="any" aria-labelledby="drawn-card-title" class="modern-dialog">
     <div class="dialog-card white-deed-card">
       <div id="drawn-card-header" class="prop-dialog-header">

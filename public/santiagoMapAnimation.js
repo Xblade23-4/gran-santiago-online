@@ -28,7 +28,7 @@
   const SANTIAGO_POINTS = [
     { id: 0, name: 'Plaza Baquedano', comuna: 'Santiago Centro / Providencia', x: 0.53, y: 0.48, color: '#ef4444', icon: '🇨🇱', type: 'go' },
     { id: 1, name: 'Av. Pajaritos', comuna: 'Maipú', x: 0.12, y: 0.62, color: '#8b4513', icon: '🐦', type: 'property' },
-    { id: 2, name: 'Polla Chilena', comuna: 'Santiago Centro', x: 0.43, y: 0.50, color: '#0284c7', icon: '🎰', type: 'community' },
+    { id: 2, name: 'Lotería de Beneficencia', comuna: 'Santiago Centro', x: 0.43, y: 0.50, color: '#0284c7', icon: '🍀', type: 'community' },
     { id: 3, name: 'Gran Avenida', comuna: 'San Miguel', x: 0.40, y: 0.82, color: '#8b4513', icon: '🛣️', type: 'property' },
     { id: 4, name: 'Impuesto SII', comuna: 'Teatinos', x: 0.38, y: 0.52, color: '#f59e0b', icon: '💸', type: 'tax' },
     { id: 5, name: 'Metro Estación Central', comuna: 'Estación Central', x: 0.23, y: 0.58, color: '#dc2626', icon: '🚆', type: 'station' },
@@ -38,12 +38,12 @@
     { id: 9, name: 'Av. Dorsal', comuna: 'Conchalí', x: 0.42, y: 0.18, color: '#38bdf8', icon: '🛣️', type: 'property' },
     { id: 10, name: 'Comisaría / De Visita', comuna: 'Santiago Centro', x: 0.34, y: 0.56, color: '#64748b', icon: '🚓', type: 'jail' },
     { id: 11, name: 'Av. Vicuña Mackenna', comuna: 'La Florida', x: 0.60, y: 0.68, color: '#ec4899', icon: '🌳', type: 'property' },
-    { id: 12, name: 'Enel Distribución', comuna: 'Santa Rosa', x: 0.47, y: 0.58, color: '#eab308', icon: '⚡', type: 'utility' },
+    { id: 12, name: 'Compañía Eléctrica', comuna: 'Santa Rosa', x: 0.47, y: 0.58, color: '#eab308', icon: '⚡', type: 'utility' },
     { id: 13, name: 'Plaza de Puente Alto', comuna: 'Puente Alto', x: 0.78, y: 0.94, color: '#ec4899', icon: '🏔️', type: 'property' },
     { id: 14, name: 'La Pintana', comuna: 'La Pintana', x: 0.54, y: 0.90, color: '#ec4899', icon: '🏘️', type: 'property' },
     { id: 15, name: 'Metro Cal y Canto', comuna: 'Santiago Norte', x: 0.42, y: 0.40, color: '#dc2626', icon: '🚇', type: 'station' },
     { id: 16, name: 'Barrio República', comuna: 'Santiago Poniente', x: 0.34, y: 0.58, color: '#f97316', icon: '🏰', type: 'property' },
-    { id: 17, name: 'Polla Chilena', comuna: 'Santiago Centro', x: 0.44, y: 0.49, color: '#0284c7', icon: '🎰', type: 'community' },
+    { id: 17, name: 'Lotería de Beneficencia', comuna: 'Santiago Centro', x: 0.44, y: 0.49, color: '#0284c7', icon: '🍀', type: 'community' },
     { id: 18, name: 'Barrio Brasil', comuna: 'Santiago Poniente', x: 0.35, y: 0.48, color: '#f97316', icon: '⛲', type: 'property' },
     { id: 19, name: 'Barrio Yungay', comuna: 'Santiago Poniente', x: 0.28, y: 0.48, color: '#f97316', icon: '🎭', type: 'property' },
     { id: 20, name: "Parque O'Higgins", comuna: 'Rondizzoni', x: 0.38, y: 0.74, color: '#10b981', icon: '🎡', type: 'freeparking' },
@@ -54,12 +54,12 @@
     { id: 25, name: 'Metro Plaza Egaña', comuna: 'La Reina / Ñuñoa', x: 0.76, y: 0.58, color: '#dc2626', icon: '🚇', type: 'station' },
     { id: 26, name: 'Plaza Ñuñoa (Irarrázaval)', comuna: 'Ñuñoa', x: 0.66, y: 0.61, color: '#eab308', icon: '🏛️', type: 'property' },
     { id: 27, name: 'Barrio Italia', comuna: 'Providencia / Ñuñoa', x: 0.58, y: 0.53, color: '#eab308', icon: '🎨', type: 'property' },
-    { id: 28, name: 'Aguas Andinas', comuna: 'Cordillera', x: 0.86, y: 0.28, color: '#06b6d4', icon: '💧', type: 'utility' },
+    { id: 28, name: 'Aguas del Valle Central', comuna: 'Cordillera', x: 0.86, y: 0.28, color: '#06b6d4', icon: '💧', type: 'utility' },
     { id: 29, name: 'Av. Macul', comuna: 'Macul', x: 0.65, y: 0.74, color: '#eab308', icon: '🏡', type: 'property' },
     { id: 30, name: 'Control Carabineros', comuna: 'Vespucio Norte', x: 0.30, y: 0.22, color: '#ef4444', icon: '🚨', type: 'gotojail' },
     { id: 31, name: 'Av. Providencia', comuna: 'Providencia', x: 0.65, y: 0.44, color: '#22c55e', icon: '🏬', type: 'property' },
     { id: 32, name: 'Pedro de Valdivia Norte', comuna: 'Providencia', x: 0.62, y: 0.37, color: '#22c55e', icon: '🌲', type: 'property' },
-    { id: 33, name: 'Polla Chilena', comuna: 'Santiago Centro', x: 0.46, y: 0.53, color: '#0284c7', icon: '🎰', type: 'community' },
+    { id: 33, name: 'Lotería de Beneficencia', comuna: 'Santiago Centro', x: 0.46, y: 0.53, color: '#0284c7', icon: '🍀', type: 'community' },
     { id: 34, name: 'Barrio Bellavista', comuna: 'Providencia', x: 0.56, y: 0.41, color: '#22c55e', icon: '🎭', type: 'property' },
     { id: 35, name: 'Metro Tobalaba', comuna: 'Sanhattan', x: 0.73, y: 0.39, color: '#dc2626', icon: '🚇', type: 'station' },
     { id: 36, name: '¡Aló Santiago!', comuna: 'Cordillera', x: 0.82, y: 0.32, color: '#eab308', icon: '❓', type: 'chance' },
@@ -341,7 +341,7 @@
     ctx.arc(scX, scY - 4, 3.2, 0, Math.PI * 2);
     ctx.fill();
 
-    // 5. Costanera Center (Torre Costanera en Sanhattan)
+    // 5. Sanhattan (Torre Costanera en Sanhattan)
     const ccX = w * 0.74;
     const ccY = h * 0.37;
     const beacon = (Math.floor(time / 450) % 2 === 0);

@@ -248,6 +248,88 @@ async function runTests() {
     assert.strictEqual(unifiedRoom.status, 'lobby', 'La sala regresa automáticamente al estado lobby');
     console.log('✅ Botón de Votar Abandonar Juego y retorno automático al Lobby verificado.');
 
+    // 10. Probar Sudoku Colaborativo Multijugador
+    // El líder de la sala pone los números y los jugadores secundarios ponen sugerencias dentro de la malla
+    await new Promise((r) => uHost.emit('vote_game', { gameType: 'sudoku' }, r));
+    assert.strictEqual(unifiedRoom.gameType, 'sudoku', 'La sala debe adoptar modo sudoku');
+
+    const startSudokuRes = await new Promise((r) =>
+      uHost.emit('start_game', { sudokuDifficulty: 'facil' }, r)
+    );
+    assert.strictEqual(startSudokuRes.ok, true, 'La partida de Sudoku debe iniciar correctamente');
+    assert.strictEqual(unifiedRoom.status, 'playing', 'La sala debe estar en estado playing para Sudoku');
+    assert.ok(unifiedRoom.sudoku, 'El estado del Sudoku debe existir en la sala');
+    assert.strictEqual(unifiedRoom.sudoku.grid.length, 81, 'La grilla de Sudoku debe tener 81 casillas');
+
+    // a) Verificar que un jugador secundario NO PUEDE ingresar números definitivos
+    const emptyCellIdx = unifiedRoom.sudoku.grid.findIndex((c) => c.value === 0);
+    assert.ok(emptyCellIdx !== -1, 'Debe haber casillas vacías en el Sudoku');
+
+    const guestSetRes = await new Promise((r) =>
+      uGuest1.emit('sudoku_set_cell', { index: emptyCellIdx, value: 7 }, r)
+    );
+    assert.strictEqual(guestSetRes.ok, false, 'Un jugador secundario NO debe poder colocar números definitivos');
+    assert.strictEqual(unifiedRoom.sudoku.grid[emptyCellIdx].value, 0, 'La casilla debe permanecer vacía');
+
+    // b) Verificar que el líder de la sala SÍ PUEDE ingresar números definitivos
+    const leaderSetRes = await new Promise((r) =>
+      uHost.emit('sudoku_set_cell', { index: emptyCellIdx, value: 4 }, r)
+    );
+    assert.strictEqual(leaderSetRes.ok, true, 'El líder debe poder fijar números definitivos');
+    assert.strictEqual(unifiedRoom.sudoku.grid[emptyCellIdx].value, 4, 'La casilla debe tener el valor asignado por el líder');
+
+    // c) Verificar que un jugador secundario PUEDE poner sugerencias en una casilla vacía
+    const anotherEmptyIdx = unifiedRoom.sudoku.grid.findIndex((c) => c.value === 0);
+    const suggRes1 = await new Promise((r) =>
+      uGuest1.emit('sudoku_toggle_suggestion', { index: anotherEmptyIdx, number: 6 }, r)
+    );
+    assert.strictEqual(suggRes1.ok, true, 'Jugador secundario puede añadir sugerencia');
+    const suggCell = unifiedRoom.sudoku.grid[anotherEmptyIdx];
+    assert.ok(suggCell.suggestions['6'], 'La sugerencia "6" debe registrarse en la casilla');
+    assert.strictEqual(suggCell.suggestions['6'][0].id, 'ug1', 'La sugerencia debe asociarse al jugador secundario');
+
+    // d) Verificar que otro jugador secundario puede sugerir el mismo número (o diferente)
+    await new Promise((r) =>
+      uGuest2.emit('sudoku_toggle_suggestion', { index: anotherEmptyIdx, number: 6 }, r)
+    );
+    assert.strictEqual(suggCell.suggestions['6'].length, 2, 'Múltiples jugadores pueden sugerir el mismo número');
+
+    // e) Retirar sugerencia al volver a pulsar
+    await new Promise((r) =>
+      uGuest1.emit('sudoku_toggle_suggestion', { index: anotherEmptyIdx, number: 6 }, r)
+    );
+    assert.strictEqual(suggCell.suggestions['6'].length, 1, 'Alternar sugerencia debe remover al jugador');
+
+    // f) Detección de conflicto / error (duplicado en fila)
+    // El líder coloca un duplicado en la misma fila
+    const firstRowCell = unifiedRoom.sudoku.grid.find((c) => c.row === 0 && !c.given);
+    const existingNumInRow = unifiedRoom.sudoku.grid.find((c) => c.row === 0 && c.value > 0).value;
+    await new Promise((r) =>
+      uHost.emit('sudoku_set_cell', { index: firstRowCell.index, value: existingNumInRow }, r)
+    );
+    assert.ok(unifiedRoom.sudoku.errors.length >= 2, 'Debe detectar error de número repetido en la fila');
+    console.log('✅ Sudoku Colaborativo: roles de líder y sugerencias secundarias en vivo verificadas.');
+
+    // 11. Verificación de propiedad intelectual y nombres protegidos
+    const { BOARD_TILES, PLAYER_AVATARS } = require('./boardData');
+    assert.ok(
+      PLAYER_AVATARS.some((a) => a.id === 'condor'),
+      'El avatar "condor" debe existir como Cóndor Andino'
+    );
+    assert.ok(
+      !BOARD_TILES.some((t) => t.name && t.name.includes('Enel')),
+      'No deben existir marcas registradas como Enel'
+    );
+    assert.ok(
+      !BOARD_TILES.some((t) => t.name && t.name.includes('Aguas Andinas')),
+      'No deben existir marcas registradas como Aguas Andinas'
+    );
+    assert.ok(
+      !BOARD_TILES.some((t) => t.name && t.name.includes('Polla Chilena')),
+      'No deben existir marcas registradas como Polla Chilena'
+    );
+    console.log('✅ Auditoría de Marcas y Propiedad Intelectual: términos comerciales y marcas registradas saneados.');
+
     console.log('\n🎉 ¡TODAS LAS PRUEBAS AUTOMATIZADAS PASARON EXITOSAMENTE!');
   } finally {
     clients.forEach((c) => c.close());

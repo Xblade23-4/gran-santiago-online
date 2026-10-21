@@ -54,6 +54,11 @@ function formatCLP(amount) {
   return '$' + Number(amount).toLocaleString('es-CL');
 }
 
+function normalizeAvatarId(id) {
+  if (id === 'condorito') return 'condor';
+  return id;
+}
+
 function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = 'STGO-';
@@ -77,17 +82,25 @@ function createInitialProperties() {
   return props;
 }
 
-const VALID_GAME_TYPES = ['santiago', 'cual_es', 'crossword', 'pictionary'];
+const {
+  createSudokuBoard,
+  validateBoard,
+  togglePlayerSuggestion,
+  countFilled
+} = require('./sudokuLogic');
+
+const VALID_GAME_TYPES = ['santiago', 'cual_es', 'crossword', 'pictionary', 'sudoku'];
 const GAME_LABELS = {
   santiago: '🚇 Gran Santiago Online',
   cual_es: '🔍 ¿Cuál es?',
   crossword: '🧩 Crucigrama Party',
-  pictionary: '🎨 Doodle Party'
+  pictionary: '🎨 Doodle Party',
+  sudoku: '🔢 Sudoku Colaborativo'
 };
 
 function recalculateWinningGameVote(room, preferredType = null) {
   if (!room.votes) room.votes = {};
-  const counts = { santiago: 0, cual_es: 0, crossword: 0, pictionary: 0 };
+  const counts = { santiago: 0, cual_es: 0, crossword: 0, pictionary: 0, sudoku: 0 };
   room.players.forEach((p) => {
     const v = room.votes[p.id];
     if (v && counts[v] !== undefined) {
@@ -129,7 +142,8 @@ function createRoom(hostPlayer, customCode, settings = {}) {
       passGoMoney: passGoMoney,
       maxPlayers: 8,
       category: settings.category || 'todo_tipo',
-      difficulty: settings.difficulty || 'Fácil'
+      difficulty: settings.difficulty || 'Fácil',
+      sudokuDifficulty: settings.sudokuDifficulty || 'facil'
     },
     players: [hostPlayer],
     turnIndex: 0,
@@ -149,6 +163,7 @@ function createRoom(hostPlayer, customCode, settings = {}) {
       penalties: {},
       lastMatch: null
     },
+    sudoku: null,
     logs: [
       {
         id: Date.now() + '-' + Math.random(),
@@ -465,11 +480,11 @@ function evaluateLandingTile(room, player, diceSum, ioInstance) {
     return;
   }
 
-  // Tarjetas de Suerte (¡Aló Santiago!) o Polla Chilena de Beneficencia
+  // Tarjetas de Suerte (¡Aló Santiago!) o Lotería de Beneficencia
   if (tile.type === 'chance' || tile.type === 'community') {
     const deck = tile.type === 'chance' ? CHANCE_CARDS : COMMUNITY_CARDS;
     const card = deck[Math.floor(Math.random() * deck.length)];
-    const deckTitle = tile.type === 'chance' ? '¡Aló Santiago! (Suerte)' : 'Polla Chilena de Beneficencia';
+    const deckTitle = tile.type === 'chance' ? '¡Aló Santiago! (Suerte)' : 'Lotería de Beneficencia';
 
     addLog(room, `🃏 [${deckTitle}] ${player.name}: "${card.title}" — ${card.text}`, 'card');
 
@@ -809,6 +824,8 @@ function resetRoomToLobby(room, reasonText = '🔄 La sala regresó al Lobby par
   room.winner = null;
   room.properties = createInitialProperties();
   room.trades = [];
+  room.votes = {};
+  room.sudoku = null;
   room.players.forEach((p) => {
     p.money = room.settings.startingMoney;
     p.position = 0;
@@ -855,6 +872,16 @@ function serializeRoom(room) {
           scores: room.cualEs.scores,
           penalties: room.cualEs.penalties,
           lastMatch: room.cualEs.lastMatch
+        }
+      : null,
+    sudoku: room.sudoku
+      ? {
+          difficulty: room.sudoku.difficulty,
+          grid: room.sudoku.grid,
+          solved: room.sudoku.solved || false,
+          errors: room.sudoku.errors || [],
+          solvedCount: room.sudoku.solvedCount || 0,
+          totalEmpty: room.sudoku.totalEmpty || 0
         }
       : null,
     logs: room.logs,
@@ -919,7 +946,8 @@ io.on('connection', (socket) => {
   socket.on('create_room', ({ playerName, avatarId, avatarImageUrl, startingMoney, gameType, category, difficulty, playerId }, callback) => {
     const cleanName = (playerName || 'Santiaguino').trim().slice(0, 20) || 'Santiaguino';
     const pid = playerId || 'p_' + Math.random().toString(36).substring(2, 10);
-    let chosenAvatar = PLAYER_AVATARS.find((a) => a.id === avatarId) || PLAYER_AVATARS[0];
+    const normAvatarId = normalizeAvatarId(avatarId);
+    let chosenAvatar = PLAYER_AVATARS.find((a) => a.id === normAvatarId) || PLAYER_AVATARS[0];
     if (avatarImageUrl && typeof avatarImageUrl === 'string' && (avatarImageUrl.startsWith('http') || avatarImageUrl.startsWith('data:image'))) {
       chosenAvatar = {
         ...chosenAvatar,
@@ -991,7 +1019,7 @@ io.on('connection', (socket) => {
   });
 
   // Actualizar ajustes de la sala en el Lobby (capital CLP, categoría o dificultad)
-  socket.on('update_lobby_settings', ({ startingMoney, category, difficulty }) => {
+  socket.on('update_lobby_settings', ({ startingMoney, category, difficulty, sudokuDifficulty }) => {
     const room = rooms.get(currentRoomCode);
     if (!room || room.status !== 'lobby' || room.hostId !== currentPlayerId) return;
     if (startingMoney !== undefined) {
@@ -1006,6 +1034,9 @@ io.on('connection', (socket) => {
     }
     if (difficulty !== undefined) {
       room.settings.difficulty = difficulty;
+    }
+    if (sudokuDifficulty !== undefined) {
+      room.settings.sudokuDifficulty = sudokuDifficulty;
     }
     broadcastRoomState(room);
     broadcastPublicRooms();
@@ -1053,7 +1084,8 @@ io.on('connection', (socket) => {
 
     // Asignar avatar preferido o uno libre
     const usedAvatars = new Set(room.players.map((p) => p.avatar.id));
-    let chosenAvatar = PLAYER_AVATARS.find((a) => a.id === avatarId && !usedAvatars.has(a.id));
+    const normAvatarId = normalizeAvatarId(avatarId);
+    let chosenAvatar = PLAYER_AVATARS.find((a) => a.id === normAvatarId && !usedAvatars.has(a.id));
     if (!chosenAvatar) {
       chosenAvatar = PLAYER_AVATARS.find((a) => !usedAvatars.has(a.id)) || PLAYER_AVATARS[0];
     }
@@ -1107,7 +1139,8 @@ io.on('connection', (socket) => {
       player.name = name.trim().slice(0, 20) || player.name;
     }
     if (avatarId) {
-      const base = PLAYER_AVATARS.find((a) => a.id === avatarId);
+      const normAvatarId = normalizeAvatarId(avatarId);
+      const base = PLAYER_AVATARS.find((a) => a.id === normAvatarId);
       if (base) {
         player.avatar = { ...base };
       }
@@ -1190,7 +1223,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const minPlayers = room.gameType === 'crossword' ? 1 : 2;
+    const minPlayers = (room.gameType === 'crossword' || room.gameType === 'sudoku') ? 1 : 2;
     if (room.players.length < minPlayers || room.players.length > 8) {
       if (cb) cb({ ok: false, error: `Se necesitan entre ${minPlayers} y 8 jugadores para comenzar.` });
       return;
@@ -1198,6 +1231,7 @@ io.on('connection', (socket) => {
 
     if (opts.category) room.settings.category = opts.category;
     if (opts.difficulty) room.settings.difficulty = opts.difficulty;
+    if (opts.sudokuDifficulty) room.settings.sudokuDifficulty = opts.sudokuDifficulty;
     if (opts.startingMoney) {
       room.settings.startingMoney = Number(opts.startingMoney) || 1500000;
       room.players.forEach((p) => {
@@ -1229,6 +1263,14 @@ io.on('connection', (socket) => {
 
     if (room.gameType === 'cual_es') {
       startCualEsGame(room);
+      broadcastRoomState(room);
+      broadcastPublicRooms();
+      if (cb) cb({ ok: true });
+      return;
+    }
+
+    if (room.gameType === 'sudoku') {
+      startSudokuGame(room);
       broadcastRoomState(room);
       broadcastPublicRooms();
       if (cb) cb({ ok: true });
@@ -1518,7 +1560,7 @@ io.on('connection', (socket) => {
     if (callback) callback({ ok: true });
   });
 
-  // Hipotecar / Deshipotecar propiedad en BancoEstado
+  // Hipotecar / Deshipotecar propiedad en Banco Metropolitano
   socket.on('toggle_mortgage', ({ tileId }, callback) => {
     const room = rooms.get(currentRoomCode);
     if (!room || room.status !== 'playing') return;
@@ -1537,7 +1579,7 @@ io.on('connection', (socket) => {
       const mortgageValue = Math.floor(tile.price / 2);
       prop.mortgaged = true;
       player.money += mortgageValue;
-      addLog(room, `🏦 ${player.name} hipotecó ${tile.name} en BancoEstado por ${formatCLP(mortgageValue)}.`, 'warning');
+      addLog(room, `🏦 ${player.name} hipotecó ${tile.name} en el Banco Metropolitano por ${formatCLP(mortgageValue)}.`, 'warning');
     } else {
       const unmortgageCost = Math.floor(tile.price * 0.55);
       if (player.money < unmortgageCost) {
@@ -1877,6 +1919,128 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ==========================================================================
+  // EVENTOS DE SUDOKU COLABORATIVO (Líder coloca números, secundarios sugieren)
+  // ==========================================================================
+  socket.on('sudoku_set_cell', ({ index, value, asGiven }, callback) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || room.status !== 'playing' || room.gameType !== 'sudoku' || !room.sudoku) {
+      if (callback) callback({ ok: false, error: 'Partida de Sudoku no activa.' });
+      return;
+    }
+    // Solo el líder de la sala puede colocar números definitivos
+    if (room.hostId !== currentPlayerId) {
+      if (callback) callback({ ok: false, error: 'Solo el líder de la sala puede colocar números definitivos.' });
+      return;
+    }
+    const cell = room.sudoku.grid[index];
+    if (!cell) {
+      if (callback) callback({ ok: false, error: 'Celda inválida.' });
+      return;
+    }
+
+    const parsedVal = Math.max(0, Math.min(9, parseInt(value, 10) || 0));
+    cell.value = parsedVal;
+    if (asGiven !== undefined) {
+      cell.given = Boolean(asGiven && parsedVal > 0);
+    }
+    if (parsedVal > 0) {
+      cell.suggestions = {}; // Limpiar sugerencias de esa celda ya resuelta
+    }
+
+    const valRes = validateBoard(room.sudoku.grid);
+    room.sudoku.errors = valRes.errors;
+    room.sudoku.solved = valRes.isComplete;
+    room.sudoku.solvedCount = valRes.filledCount;
+    room.sudoku.totalEmpty = 81 - valRes.filledCount;
+
+    const player = room.players.find((p) => p.id === currentPlayerId);
+    if (parsedVal > 0) {
+      addLog(room, `👑 ${player?.name || 'Líder'} fijó el número ${parsedVal} en fila ${cell.row + 1}, columna ${cell.col + 1}.`, 'info');
+    } else {
+      addLog(room, `👑 ${player?.name || 'Líder'} borró el número en fila ${cell.row + 1}, columna ${cell.col + 1}.`, 'info');
+    }
+
+    if (valRes.isComplete) {
+      addLog(room, `🎉 ¡FELICITACIONES! ¡El equipo completó el Sudoku con éxito! 🏆👏`, 'success');
+    }
+
+    broadcastRoomState(room);
+    if (callback) callback({ ok: true, solved: valRes.isComplete, errors: valRes.errors });
+  });
+
+  socket.on('sudoku_toggle_suggestion', ({ index, number }, callback) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || room.status !== 'playing' || room.gameType !== 'sudoku' || !room.sudoku) {
+      if (callback) callback({ ok: false });
+      return;
+    }
+    const player = room.players.find((p) => p.id === currentPlayerId);
+    if (!player) return;
+    const cell = room.sudoku.grid[index];
+    if (!cell || cell.value > 0) {
+      if (callback) callback({ ok: false, error: 'Esta celda ya tiene un número definitivo.' });
+      return;
+    }
+
+    const changed = togglePlayerSuggestion(cell, parseInt(number, 10), player);
+    if (changed) {
+      broadcastRoomState(room);
+    }
+    if (callback) callback({ ok: true });
+  });
+
+  socket.on('sudoku_clear_cell', ({ index }, callback) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || !room.sudoku) return;
+    const cell = room.sudoku.grid[index];
+    if (!cell) return;
+
+    if (room.hostId === currentPlayerId) {
+      if (!cell.given) {
+        cell.value = 0;
+        cell.suggestions = {};
+      }
+    } else {
+      if (cell.suggestions) {
+        for (const numKey of Object.keys(cell.suggestions)) {
+          cell.suggestions[numKey] = (cell.suggestions[numKey] || []).filter((s) => s.id !== currentPlayerId);
+          if (cell.suggestions[numKey].length === 0) delete cell.suggestions[numKey];
+        }
+      }
+    }
+    const valRes = validateBoard(room.sudoku.grid);
+    room.sudoku.errors = valRes.errors;
+    room.sudoku.solved = valRes.isComplete;
+    broadcastRoomState(room);
+    if (callback) callback({ ok: true });
+  });
+
+  socket.on('sudoku_load_preset', ({ difficulty }, callback) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || room.gameType !== 'sudoku') return;
+    if (room.hostId !== currentPlayerId) {
+      if (callback) callback({ ok: false, error: 'Solo el líder puede cargar o reiniciar tableros.' });
+      return;
+    }
+    const diff = difficulty || 'facil';
+    room.settings.sudokuDifficulty = diff;
+    room.sudoku = createSudokuBoard(diff);
+    addLog(room, `🔄 El líder cargó un nuevo tablero Sudoku (${diff.toUpperCase()}).`, 'system');
+    broadcastRoomState(room);
+    if (callback) callback({ ok: true });
+  });
+
+  socket.on('sudoku_check', (callback) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || !room.sudoku) return;
+    const valRes = validateBoard(room.sudoku.grid);
+    room.sudoku.errors = valRes.errors;
+    room.sudoku.solved = valRes.isComplete;
+    broadcastRoomState(room);
+    if (callback) callback(valRes);
+  });
+
   socket.on('disconnect', () => {
     // Limpiar sesión de GameParty si estaba en una sala de Crucigrama o Doodle Party
     const gpLeave = gamePartyManager.leaveRoom(socket.id);
@@ -2112,6 +2276,21 @@ function finishCualEsGame(room) {
   addLog(
     room,
     `🏆 ¡Fin del mazo en "¿Cuál es?"! Ganador: ${bestPlayer.avatar.icon} ${bestPlayer.name} con ${bestScore} cartas ganadas.`,
+    'success'
+  );
+}
+
+// ============================================================================
+// MOTOR DEL SUDOKU COLABORATIVO (Líder coloca números, secundarios sugieren)
+// ============================================================================
+function startSudokuGame(room) {
+  const diff = room.settings.sudokuDifficulty || 'facil';
+  room.sudoku = createSudokuBoard(diff);
+  room.status = 'playing';
+  room.winner = null;
+  addLog(
+    room,
+    `🧩 ¡Comenzó el Sudoku Colaborativo (${diff.toUpperCase()})! El líder define los números definitivos y los jugadores secundarios colocan notas y sugerencias.`,
     'success'
   );
 }

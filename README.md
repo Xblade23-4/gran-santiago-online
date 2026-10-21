@@ -17,9 +17,9 @@ Juego de mesa multijugador **en tiempo real (Online)** inspirado en el clásico 
 3. **Compra de Propiedades, Casas y Torres**:
    - **22 Calles y Comunas de Santiago** divididas en 8 sectores de color (*Maipú, San Miguel, Patronato, Independencia, Barrio Franklin, La Florida, Puente Alto, Macul, Barrio República, Barrio Brasil, Bellavista, Paseo Ahumada, Lastarria, Alameda, Ñuñoa, Barrio Italia, Parque Forestal, Providencia, El Golf, Vitacura y Sanhattan*).
    - **4 Estaciones de Metro de Santiago** (*Estación Central, Cal y Canto, Plaza Egaña y Tobalaba*).
-   - **2 Servicios Básicos** (*Enel Distribución* y *Aguas Andinas*).
+   - **2 Servicios Básicos** (*Compañía Eléctrica* y *Aguas del Valle Central*).
    - Construcción de **1 a 4 Casas (🏠)** y **Torre Costanera / Hotel (🏙️)** al poseer el grupo completo.
-   - Sistema de **Hipotecas en BancoEstado** y **Bolsa de Comercio (Trueques/Negociaciones)** entre jugadores.
+   - Sistema de **Hipotecas Bancarias** y **Bolsa de Comercio (Trueques/Negociaciones)** entre jugadores.
 
 ---
 

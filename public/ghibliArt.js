@@ -1,14 +1,16 @@
 /**
- * ghibliArt.js - Ilustraciones estilo Studio Ghibli para las tarjetas de lugares de Gran Santiago
- * Genera escenas vectoriales SVG detalladas con estética de acuarela, cielos pastel,
- * cordillera nevada de los Andes, arquitectura nostálgica y naturaleza exuberante.
+ * scenicArt.js (ghibliArt.js) - Ilustraciones artísticas vectoriales para las tarjetas de lugares de Gran Santiago
+ * Genera escenas vectoriales SVG detalladas con estética de acuarela paisajista, cielos pastel,
+ * cordillera nevada de los Andes, arquitectura santiaguina y vegetación urbana.
  */
 
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory();
   } else {
-    root.GhibliArt = factory();
+    const exported = factory();
+    root.ScenicArt = exported;
+    root.GhibliArt = exported; // Alias de retrocompatibilidad
   }
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
@@ -158,7 +160,7 @@
     // 1. SANHATTAN / TORRE COSTANERA (Tile 39)
     if (id === 39) {
       return `
-        <!-- Torre Costanera Center y skyline moderno con vegetación Ghibli -->
+        <!-- Gran Torre Sanhattan y skyline moderno con vegetación urbana -->
         <g class="landmark-costanera">
           <!-- Silueta rascacielos secundarios -->
           <rect x="180" y="58" width="28" height="70" rx="2" fill="#2d3748" opacity="0.6" />
@@ -499,6 +501,7 @@
   }
 
   return {
+    getScenicArtworkSVG: getGhibliArtworkSVG,
     getGhibliArtworkSVG,
     getPaletteForTile
   };

@@ -39,7 +39,7 @@ let customAuthProvider = localStorage.getItem('gso_custom_auth_provider') || nul
 let customUserName = localStorage.getItem('gso_custom_user_name') || null;
 let activeSocialModalTarget = 'google';
 
-let selectedAvatarId = customAvatarImageUrl ? 'custom_avatar' : 'condorito';
+let selectedAvatarId = customAvatarImageUrl ? 'custom_avatar' : (boardMeta?.PLAYER_AVATARS?.[0]?.id || 'condor');
 let selectedGameType = 'santiago';
 let currentRoomState = null;
 let myPenaltyUntil = 0;
@@ -705,7 +705,8 @@ const GAME_META_LABELS = {
   santiago: { title: '🚇 Gran Santiago Online', short: 'Gran Santiago', icon: '🚇' },
   cual_es: { title: '🔍 ¿Cuál es? (Coincidencias)', short: '¿Cuál es?', icon: '🔍' },
   crossword: { title: '🧩 Crucigrama Party', short: 'Crucigrama Party', icon: '🧩' },
-  pictionary: { title: '🎨 Doodle Party', short: 'Doodle Party', icon: '🎨' }
+  pictionary: { title: '🎨 Doodle Party', short: 'Doodle Party', icon: '🎨' },
+  sudoku: { title: '🔢 Sudoku Colaborativo', short: 'Sudoku Colaborativo', icon: '🔢' }
 };
 
 function parseJwt(token) {
@@ -936,7 +937,7 @@ function initSocialAuth() {
     customAvatarImageUrl = null;
     customAuthProvider = null;
     customUserName = null;
-    selectedAvatarId = boardMeta.PLAYER_AVATARS[0]?.id || 'condorito';
+    selectedAvatarId = boardMeta.PLAYER_AVATARS[0]?.id || 'condor';
 
     localStorage.removeItem('gso_custom_avatar_url');
     localStorage.removeItem('gso_custom_auth_provider');
@@ -1219,6 +1220,9 @@ function bindUIEvents() {
   document.getElementById('lobby-select-difficulty')?.addEventListener('change', (e) => {
     socket.emit('update_lobby_settings', { difficulty: e.target.value });
   });
+  document.getElementById('lobby-select-sudoku-diff')?.addEventListener('change', (e) => {
+    socket.emit('update_lobby_settings', { sudokuDifficulty: e.target.value });
+  });
 
   // Chat en vivo dentro del Lobby Unificado
   document.getElementById('lobby-chat-form')?.addEventListener('submit', (e) => {
@@ -1381,8 +1385,9 @@ function bindUIEvents() {
   document.getElementById('btn-start-game').addEventListener('click', () => {
     const category = document.getElementById('lobby-select-category')?.value || 'todo_tipo';
     const difficulty = document.getElementById('lobby-select-difficulty')?.value || 'Fácil';
+    const sudokuDifficulty = document.getElementById('lobby-select-sudoku-diff')?.value || 'facil';
     const startingMoney = Number(document.getElementById('lobby-select-money')?.value) || 1500000;
-    socket.emit('start_game', { category, difficulty, startingMoney }, (res) => {
+    socket.emit('start_game', { category, difficulty, sudokuDifficulty, startingMoney }, (res) => {
       if (res && !res.ok) showToast(res.error);
     });
   });
@@ -2106,8 +2111,8 @@ function renderLobby(state) {
     gameLabel.textContent = gMeta.title;
   }
 
-  // Contabilizar votos y mostrar avatares de votantes en cada una de las 4 tarjetas
-  const allGameKeys = ['santiago', 'cual_es', 'crossword', 'pictionary'];
+  // Contabilizar votos y mostrar avatares de votantes en cada una de las tarjetas
+  const allGameKeys = ['santiago', 'cual_es', 'crossword', 'pictionary', 'sudoku'];
   allGameKeys.forEach((gKey) => {
     const cardEl = document.getElementById(`vote-card-${gKey}`);
     const badgeEl = document.getElementById(`vote-badge-${gKey}`);
@@ -2146,11 +2151,13 @@ function renderLobby(state) {
   // Mostrar ajustes contextuales según el juego más votado
   const moneyWrap = document.getElementById('lobby-money-setting-wrap');
   const partyWrap = document.getElementById('lobby-party-setting-wrap');
+  const sudokuWrap = document.getElementById('lobby-sudoku-setting-wrap');
   const settingsBar = document.getElementById('lobby-game-settings-bar');
 
   if (activeGame === 'santiago') {
     moneyWrap?.classList.remove('hidden');
     partyWrap?.classList.add('hidden');
+    sudokuWrap?.classList.add('hidden');
     settingsBar?.classList.remove('hidden');
     const moneySel = document.getElementById('lobby-select-money');
     if (moneySel) {
@@ -2160,6 +2167,7 @@ function renderLobby(state) {
   } else if (activeGame === 'crossword' || activeGame === 'pictionary') {
     moneyWrap?.classList.add('hidden');
     partyWrap?.classList.remove('hidden');
+    sudokuWrap?.classList.add('hidden');
     settingsBar?.classList.remove('hidden');
     const catSel = document.getElementById('lobby-select-category');
     const diffSel = document.getElementById('lobby-select-difficulty');
@@ -2171,7 +2179,20 @@ function renderLobby(state) {
       diffSel.value = state.settings?.difficulty || 'Fácil';
       diffSel.disabled = !isHost;
     }
+  } else if (activeGame === 'sudoku') {
+    moneyWrap?.classList.add('hidden');
+    partyWrap?.classList.add('hidden');
+    sudokuWrap?.classList.remove('hidden');
+    settingsBar?.classList.remove('hidden');
+    const diffSel = document.getElementById('lobby-select-sudoku-diff');
+    if (diffSel) {
+      diffSel.value = state.settings?.sudokuDifficulty || 'facil';
+      diffSel.disabled = !isHost;
+    }
   } else {
+    moneyWrap?.classList.add('hidden');
+    partyWrap?.classList.add('hidden');
+    sudokuWrap?.classList.add('hidden');
     settingsBar?.classList.add('hidden');
   }
 
@@ -2180,7 +2201,7 @@ function renderLobby(state) {
       ? 'inline-flex'
       : 'none';
 
-  const minPlayers = activeGame === 'crossword' ? 1 : 2;
+  const minPlayers = (activeGame === 'crossword' || activeGame === 'sudoku') ? 1 : 2;
   const startBtn = document.getElementById('btn-start-game');
   startBtn.disabled = !isHost || state.players.length < minPlayers;
   startBtn.textContent = `🚀 ¡Iniciar ${gMeta.short}!`;
@@ -2301,9 +2322,13 @@ function renderGame(state) {
   const returnLobbySantiagoBtn = document.getElementById('btn-return-lobby-santiago');
   const logPanelBox = document.getElementById('log-panel-box');
 
-  boardGridEl.classList.toggle('hidden', isCualEs);
+  const isSudoku = state.gameType === 'sudoku';
+  const sudokuArenaEl = document.getElementById('sudoku-arena');
+
+  boardGridEl.classList.toggle('hidden', isCualEs || isSudoku);
   cualesArenaEl.classList.toggle('hidden', !isCualEs);
-  santiagoPortfolioEl.classList.toggle('hidden', isCualEs);
+  if (sudokuArenaEl) sudokuArenaEl.classList.toggle('hidden', !isSudoku);
+  santiagoPortfolioEl.classList.toggle('hidden', isCualEs || isSudoku);
   cualesRulesEl.classList.toggle('hidden', !isCualEs);
   if (logPanelBox) logPanelBox.classList.toggle('hidden', isCualEs);
 
@@ -2315,11 +2340,19 @@ function renderGame(state) {
   }
 
   if (sidebarTitleEl) {
-    sidebarTitleEl.textContent = isCualEs ? '🏆 Ranking de Cartas' : '👥 Magnates en Competencia';
+    sidebarTitleEl.textContent = isCualEs
+      ? '🏆 Ranking de Cartas'
+      : (isSudoku ? '👥 Equipo Colaborativo' : '👥 Magnates en Competencia');
   }
 
   if (isCualEs) {
     renderCualEsGame(state);
+    renderLogsAndChat(state);
+    return;
+  }
+
+  if (isSudoku) {
+    renderSudokuGame(state);
     renderLogsAndChat(state);
     return;
   }
@@ -2830,6 +2863,321 @@ function renderCualEsGame(state) {
   });
 }
 
+// ============================================================================
+// MOTOR DEL SUDOKU COLABORATIVO (CLIENTE)
+// ============================================================================
+let selectedSudokuCellIndex = null;
+let sudokuListenersAttached = false;
+
+function setupSudokuEventListeners() {
+  if (sudokuListenersAttached) return;
+  sudokuListenersAttached = true;
+
+  // Teclas numéricas 1-9
+  document.querySelectorAll('.skp-btn[data-num]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const num = parseInt(btn.dataset.num, 10);
+      handleSudokuDigitInput(num);
+    });
+  });
+
+  // Botón Borrar
+  document.getElementById('btn-sudoku-key-clear')?.addEventListener('click', () => {
+    handleSudokuClearInput();
+  });
+
+  // Botón Validar Tablero
+  document.getElementById('btn-sudoku-validate')?.addEventListener('click', () => {
+    playTone(580, 0.08, 'sine');
+    socket.emit('sudoku_check', (res) => {
+      if (!res) return;
+      if (res.isComplete) {
+        showToast('🎉 ¡Excelente! ¡El Sudoku está completo y perfecto!');
+      } else if (res.isValid) {
+        showToast(`✅ Tablero válido hasta ahora (${res.filledCount}/81 casillas llenas). ¡Sigan así!`);
+      } else {
+        showToast(`⚠️ Se detectaron ${res.errors.length} casillas con números repetidos.`);
+      }
+    });
+  });
+
+  // Botón Cargar Preset / Dificultad
+  document.getElementById('btn-sudoku-load-preset')?.addEventListener('click', () => {
+    const diff = document.getElementById('sudoku-preset-select')?.value || 'facil';
+    playTone(440, 0.1, 'sine');
+    socket.emit('sudoku_load_preset', { difficulty: diff }, (res) => {
+      if (res && !res.ok) showToast(res.error);
+    });
+  });
+
+  // Botón Limpiar Todo
+  document.getElementById('btn-sudoku-clear-all')?.addEventListener('click', () => {
+    if (confirm('¿Reiniciar todo el tablero de Sudoku?')) {
+      const diff = document.getElementById('sudoku-preset-select')?.value || 'custom';
+      socket.emit('sudoku_load_preset', { difficulty: diff });
+    }
+  });
+
+  // Votar abandonar Sudoku
+  document.getElementById('btn-sudoku-vote-abandon')?.addEventListener('click', () => {
+    socket.emit('vote_abandon_game');
+  });
+
+  // Botón volver tras victoria
+  document.getElementById('btn-sudoku-finish-return')?.addEventListener('click', () => {
+    socket.emit('vote_abandon_game');
+  });
+
+  // Soporte de Teclado Físico
+  window.addEventListener('keydown', (e) => {
+    if (!currentRoomState || currentRoomState.gameType !== 'sudoku' || currentRoomState.status !== 'playing') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    if (e.key >= '1' && e.key <= '9') {
+      handleSudokuDigitInput(parseInt(e.key, 10));
+    } else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+      handleSudokuClearInput();
+    } else if (e.key.startsWith('Arrow')) {
+      handleSudokuArrowNav(e.key);
+    }
+  });
+}
+
+function handleSudokuDigitInput(num) {
+  if (selectedSudokuCellIndex === null || !currentRoomState || !currentRoomState.sudoku) return;
+  const isHost = currentRoomState.hostId === myPlayerId;
+  const cell = currentRoomState.sudoku.grid[selectedSudokuCellIndex];
+  if (!cell) return;
+
+  if (isHost) {
+    playTone(660, 0.08, 'triangle');
+    socket.emit('sudoku_set_cell', { index: selectedSudokuCellIndex, value: num }, (res) => {
+      if (res && !res.ok) showToast(res.error);
+    });
+  } else {
+    if (cell.value > 0) {
+      showToast('Esta casilla ya tiene un número definitivo puesto por el líder.');
+      return;
+    }
+    playTone(520, 0.06, 'sine');
+    socket.emit('sudoku_toggle_suggestion', { index: selectedSudokuCellIndex, number: num });
+  }
+}
+
+function handleSudokuClearInput() {
+  if (selectedSudokuCellIndex === null || !currentRoomState) return;
+  playTone(330, 0.08, 'sine');
+  socket.emit('sudoku_clear_cell', { index: selectedSudokuCellIndex });
+}
+
+function handleSudokuArrowNav(arrowKey) {
+  if (selectedSudokuCellIndex === null) {
+    selectedSudokuCellIndex = 0;
+  } else {
+    let r = Math.floor(selectedSudokuCellIndex / 9);
+    let c = selectedSudokuCellIndex % 9;
+    if (arrowKey === 'ArrowUp') r = (r + 8) % 9;
+    else if (arrowKey === 'ArrowDown') r = (r + 1) % 9;
+    else if (arrowKey === 'ArrowLeft') c = (c + 8) % 9;
+    else if (arrowKey === 'ArrowRight') c = (c + 1) % 9;
+    selectedSudokuCellIndex = r * 9 + c;
+  }
+  if (currentRoomState) renderSudokuGame(currentRoomState);
+}
+
+function renderSudokuGame(state) {
+  setupSudokuEventListeners();
+  const su = state.sudoku;
+  if (!su || !su.grid) return;
+
+  const isHost = state.hostId === myPlayerId;
+
+  // Header y Roles
+  const roleHintEl = document.getElementById('sudoku-role-hint');
+  if (roleHintEl) {
+    roleHintEl.textContent = isHost
+      ? '👑 Eres el Líder: Tienes el control de ingresar los números definitivos (1-9).'
+      : '💡 Eres Colaborador: Haz clic en casillas vacías para colocar o quitar sugerencias de números.';
+  }
+
+  const leaderToolbar = document.getElementById('sudoku-leader-toolbar');
+  if (leaderToolbar) {
+    leaderToolbar.classList.toggle('hidden', !isHost);
+  }
+
+  const filledCountEl = document.getElementById('sudoku-stat-filled');
+  if (filledCountEl) {
+    filledCountEl.textContent = su.solvedCount || 0;
+  }
+
+  const abandonBtn = document.getElementById('btn-sudoku-vote-abandon');
+  if (abandonBtn) {
+    const abVotes = state.abandonVotes || [];
+    abandonBtn.textContent = `🏳️ Votar Abandonar (${abVotes.length}/${state.abandonRequired || 1})`;
+  }
+
+  const presetSel = document.getElementById('sudoku-preset-select');
+  if (presetSel && document.activeElement !== presetSel) {
+    presetSel.value = su.difficulty || 'facil';
+  }
+
+  // Renderizar las 81 celdas del Sudoku
+  const gridEl = document.getElementById('sudoku-grid');
+  gridEl.innerHTML = '';
+
+  const selCell = selectedSudokuCellIndex !== null ? su.grid[selectedSudokuCellIndex] : null;
+  const selRow = selCell ? selCell.row : -1;
+  const selCol = selCell ? selCell.col : -1;
+  const selBox = selCell ? selCell.box : -1;
+
+  su.grid.forEach((cell, idx) => {
+    const cellEl = document.createElement('div');
+    cellEl.className = 'sudoku-cell';
+    cellEl.dataset.index = idx;
+
+    const isSelected = idx === selectedSudokuCellIndex;
+    const isPeer = selCell && (cell.row === selRow || cell.col === selCol || cell.box === selBox);
+    const hasError = su.errors && su.errors.includes(idx);
+
+    if (isSelected) cellEl.classList.add('cell-selected');
+    else if (isPeer) cellEl.classList.add('cell-peer');
+
+    if (hasError) cellEl.classList.add('cell-error');
+
+    if (cell.value > 0) {
+      if (cell.given) {
+        cellEl.classList.add('cell-given');
+      } else {
+        cellEl.classList.add('cell-leader-val');
+      }
+      cellEl.textContent = cell.value;
+    } else {
+      // Grilla 3x3 de sugerencias / notas
+      const notesGrid = document.createElement('div');
+      notesGrid.className = 'cell-notes-grid';
+
+      for (let n = 1; n <= 9; n++) {
+        const noteItem = document.createElement('div');
+        noteItem.className = 'cell-note-item';
+        const suggList = cell.suggestions?.[String(n)];
+        if (suggList && suggList.length > 0) {
+          noteItem.classList.add('has-suggestion');
+          noteItem.textContent = n;
+          const names = suggList.map((s) => s.name).join(', ');
+          noteItem.title = `Sugerido por: ${names}`;
+          // Si yo lo sugerí, resaltar color
+          if (suggList.some((s) => s.id === myPlayerId)) {
+            noteItem.style.fontWeight = '900';
+            noteItem.style.textDecoration = 'underline';
+          }
+        }
+        notesGrid.appendChild(noteItem);
+      }
+      cellEl.appendChild(notesGrid);
+    }
+
+    cellEl.addEventListener('click', () => {
+      selectedSudokuCellIndex = idx;
+      playTone(480, 0.04, 'sine');
+      renderSudokuGame(state);
+    });
+
+    gridEl.appendChild(cellEl);
+  });
+
+  // Actualizar panel inferior de teclado y sugerencias
+  updateSudokuKeypadUI(state);
+
+  // Overlay de victoria
+  const victoryOverlay = document.getElementById('sudoku-victory-overlay');
+  if (victoryOverlay) {
+    victoryOverlay.classList.toggle('hidden', !su.solved);
+  }
+
+  // Lista lateral de jugadores para Sudoku
+  const playersList = document.getElementById('players-list');
+  if (playersList) {
+    playersList.innerHTML = '';
+    state.players.forEach((p) => {
+      const row = document.createElement('div');
+      row.className = 'player-row' + (p.id === state.hostId ? ' active-turn' : '');
+      row.style.borderLeftColor = p.avatar?.color || '#3B82F6';
+      const avDisplay = p.avatar?.imageUrl
+        ? `<img src="${p.avatar.imageUrl}" alt="${p.name}" class="avatar-photo-img" />`
+        : (p.avatar?.icon || '👤');
+      const roleLabel = p.id === state.hostId ? '👑 Líder' : '💡 Colaborador';
+      row.innerHTML = `
+        <div class="p-info">
+          <span class="p-avatar">${avDisplay}</span>
+          <div>
+            <div class="p-name">${p.name} ${p.id === myPlayerId ? '(Tú)' : ''}</div>
+            <span class="p-status-tag">${roleLabel}</span>
+          </div>
+        </div>
+      `;
+      playersList.appendChild(row);
+    });
+  }
+}
+
+function updateSudokuKeypadUI(state) {
+  const isHost = state.hostId === myPlayerId;
+  const titleEl = document.getElementById('sudoku-keypad-title');
+  const infoEl = document.getElementById('sudoku-selected-cell-info');
+  const suggBarEl = document.getElementById('sudoku-cell-suggestions-bar');
+  const suggListEl = document.getElementById('sudoku-cell-suggestions-list');
+
+  if (selectedSudokuCellIndex === null) {
+    if (titleEl) titleEl.textContent = '👆 Haz clic en una casilla del tablero para comenzar';
+    if (infoEl) infoEl.textContent = '';
+    if (suggBarEl) suggBarEl.classList.add('hidden');
+    return;
+  }
+
+  const cell = state.sudoku?.grid?.[selectedSudokuCellIndex];
+  if (!cell) return;
+
+  if (infoEl) {
+    infoEl.textContent = `Fila ${cell.row + 1}, Columna ${cell.col + 1}` + (cell.given ? ' (Pista Fija)' : '');
+  }
+
+  if (titleEl) {
+    if (cell.given) {
+      titleEl.textContent = '🔒 Casilla con pista inicial protegida.';
+    } else if (isHost) {
+      titleEl.textContent = '👑 Elige el número definitivo para esta casilla:';
+    } else {
+      titleEl.textContent = cell.value > 0
+        ? '✅ Casilla resuelta por el líder.'
+        : '💡 Toca un número para sugerir o retirar tu nota:';
+    }
+  }
+
+  // Si el líder seleccionó una casilla vacía con sugerencias del equipo, mostrarlas como accesos rápidos
+  if (isHost && cell.value === 0 && cell.suggestions && Object.keys(cell.suggestions).length > 0) {
+    if (suggBarEl) suggBarEl.classList.remove('hidden');
+    if (suggListEl) {
+      suggListEl.innerHTML = '';
+      Object.entries(cell.suggestions).forEach(([numStr, pList]) => {
+        if (!pList || pList.length === 0) return;
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'scsb-pill';
+        const names = pList.map((p) => p.name).join(', ');
+        pill.innerHTML = `<strong>${numStr}</strong> (${names})`;
+        pill.title = `Aceptar sugerencia de ${names}`;
+        pill.addEventListener('click', () => {
+          playTone(660, 0.08, 'triangle');
+          socket.emit('sudoku_set_cell', { index: selectedSudokuCellIndex, value: parseInt(numStr, 10) });
+        });
+        suggListEl.appendChild(pill);
+      });
+    }
+  } else {
+    if (suggBarEl) suggBarEl.classList.add('hidden');
+  }
+}
+
 function renderMyProperties(state) {
   const myPropsContainer = document.getElementById('my-properties-list');
   const myOwnedTiles = boardMeta.BOARD_TILES.filter(
@@ -3053,7 +3401,7 @@ function openPropertyModal(tileId) {
 
     const rows = [
       { label: 'Sitio Sin Edificar (Base)', amount: tile.rents[0], isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 0 && !hasMonopoly) },
-      { label: 'Con Villa Completa (Monopolio 2×)', amount: tile.rents[0] * 2, isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 0 && hasMonopoly) },
+      { label: 'Con Barrio Completo (Renta Doble 2×)', amount: tile.rents[0] * 2, isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 0 && hasMonopoly) },
       { label: 'Con 1 Casa 🏠', amount: tile.rents[1], isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 1) },
       { label: 'Con 2 Casas 🏠🏠', amount: tile.rents[2], isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 2) },
       { label: 'Con 3 Casas 🏠🏠🏠', amount: tile.rents[3], isCurrent: Boolean(ownerId && !propState.mortgaged && propState.houses === 3) },
@@ -3101,7 +3449,7 @@ function openPropertyModal(tileId) {
     const uIcon = tile.icon || '⚡';
     [
       { label: `${uIcon} Con 1 Servicio Básico`, val: '4.000 × Dados' },
-      { label: `⚡💧 Con Ambos Servicios (Enel + Aguas Andinas)`, val: '10.000 × Dados' }
+      { label: `⚡💧 Con Ambos Servicios (Luz + Agua Potable)`, val: '10.000 × Dados' }
     ].forEach((row) => {
       const tr = document.createElement('tr');
       tr.innerHTML = `<td>${row.label}</td><td>${row.val}</td>`;
