@@ -310,6 +310,21 @@ async function runTests() {
     assert.ok(unifiedRoom.sudoku.errors.length >= 2, 'Debe detectar error de número repetido en la fila');
     console.log('✅ Sudoku Colaborativo: roles de líder y sugerencias secundarias en vivo verificadas.');
 
+    // g) Verificación de 1000 tablas distintas en cada dificultad de Sudoku
+    const { PRESET_PUZZLES: SUDOKU_PRESETS } = require('./sudokuLogic');
+    assert.strictEqual(SUDOKU_PRESETS.facil.length, 1000, 'Deben existir 1000 tablas de Sudoku Fácil');
+    assert.strictEqual(SUDOKU_PRESETS.medio.length, 1000, 'Deben existir 1000 tablas de Sudoku Medio');
+    assert.strictEqual(SUDOKU_PRESETS.dificil.length, 1000, 'Deben existir 1000 tablas de Sudoku Difícil');
+
+    const setFacil = new Set(SUDOKU_PRESETS.facil.map((p) => p.clues));
+    const setMedio = new Set(SUDOKU_PRESETS.medio.map((p) => p.clues));
+    const setDificil = new Set(SUDOKU_PRESETS.dificil.map((p) => p.clues));
+
+    assert.strictEqual(setFacil.size, 1000, 'Todas las 1000 tablas fáciles deben ser únicas');
+    assert.strictEqual(setMedio.size, 1000, 'Todas las 1000 tablas medias deben ser únicas');
+    assert.strictEqual(setDificil.size, 1000, 'Todas las 1000 tablas difíciles deben ser únicas');
+    console.log('✅ Banco de Sudoku verificado: 1.000 tablas distintas y únicas en cada dificultad (Fácil, Medio, Difícil).');
+
     // 11. Verificación de propiedad intelectual y nombres protegidos
     const { BOARD_TILES, PLAYER_AVATARS } = require('./boardData');
     assert.ok(

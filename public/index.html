@@ -285,11 +285,11 @@
                 </select>
               </div>
               <div id="lobby-sudoku-setting-wrap" class="lobby-setting-item hidden">
-                <label for="lobby-select-sudoku-diff">🧩 Dificultad Sudoku:</label>
+                <label for="lobby-select-sudoku-diff">🧩 Dificultad Sudoku (1.000 tablas por nivel):</label>
                 <select id="lobby-select-sudoku-diff">
-                  <option value="facil">🟢 Fácil (Pistas abundantes)</option>
-                  <option value="medio">🟡 Medio (Equilibrado)</option>
-                  <option value="dificil">🔴 Difícil (Desafío mental)</option>
+                  <option value="facil">🟢 Fácil (1.000 tablas únicas)</option>
+                  <option value="medio">🟡 Medio (1.000 tablas únicas)</option>
+                  <option value="dificil">🔴 Difícil (1.000 tablas únicas)</option>
                   <option value="custom">⚪ En Blanco (Líder ingresa números)</option>
                 </select>
               </div>
@@ -524,12 +524,13 @@
             <div class="slt-group">
               <label for="sudoku-preset-select">Dificultad:</label>
               <select id="sudoku-preset-select" class="sudoku-select-sm">
-                <option value="facil">Fácil</option>
-                <option value="medio">Medio</option>
-                <option value="dificil">Difícil</option>
-                <option value="custom">En Blanco</option>
+                <option value="facil">🟢 Fácil (1.000 tablas)</option>
+                <option value="medio">🟡 Medio (1.000 tablas)</option>
+                <option value="dificil">🔴 Difícil (1.000 tablas)</option>
+                <option value="custom">⚪ En Blanco</option>
               </select>
-              <button type="button" id="btn-sudoku-load-preset" class="btn btn-secondary btn-xs">🔄 Cargar</button>
+              <button type="button" id="btn-sudoku-load-preset" class="btn btn-secondary btn-xs" title="Cargar otra de las 1.000 tablas aleatoriamente">🎲 Nueva Tabla</button>
+              <span id="sudoku-current-puzzle-name" class="badge-sub" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(56,189,248,0.2);color:#38bdf8;border-radius:6px;font-weight:700;">Fácil</span>
             </div>
             <button type="button" id="btn-sudoku-validate" class="btn btn-info btn-xs">✔️ Validar Tablero</button>
             <button type="button" id="btn-sudoku-clear-all" class="btn btn-ghost btn-xs">🧹 Limpiar Todo</button>

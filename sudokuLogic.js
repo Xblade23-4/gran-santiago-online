@@ -2,120 +2,69 @@
  * sudokuLogic.js - Lógica, puzzles predefinidos y validación para Sudoku Colaborativo
  * El líder de la sala define los números oficiales y los jugadores secundarios
  * aportan sugerencias y notas (pencil marks) en tiempo real.
+ * 
+ * Incluye un banco de 1000 tablas distintas y únicas de Sudoku por cada dificultad:
+ * - 1000 tablas Fácil
+ * - 1000 tablas Medio
+ * - 1000 tablas Difícil
  */
 
 'use strict';
 
-// Puzzles predefinidos verificados (81 caracteres, '.' o '0' para celdas vacías)
-const PRESET_PUZZLES = {
-  facil: [
-    {
-      name: 'Fácil Clásico #1',
-      clues:
-        '53..7....' +
-        '6..195...' +
-        '.98....6.' +
-        '8...6...3' +
-        '4..8.3..1' +
-        '7...2...6' +
-        '.6....28.' +
-        '...419..5' +
-        '....8..79',
-      solution:
-        '534678912' +
-        '672195348' +
-        '198342567' +
-        '859761423' +
-        '426853791' +
-        '713924856' +
-        '961537284' +
-        '287419635' +
-        '345286179'
-    },
-    {
-      name: 'Fácil Amigable #2',
-      clues:
-        '...26.7.1' +
-        '68..7..9.' +
-        '19...45..' +
-        '82.1...4.' +
-        '..46.29..' +
-        '.5...3.28' +
-        '..93...74' +
-        '.4..5..36' +
-        '7.3.18...'
-    }
-  ],
-  medio: [
-    {
-      name: 'Medio Equilibrado #1',
-      clues:
-        '..3.2.6..' +
-        '9..3.5..1' +
-        '..18.64..' +
-        '..81.29..' +
-        '7.......8' +
-        '..67.82..' +
-        '..26.95..' +
-        '8..2.3..9' +
-        '..5.1.3..'
-    },
-    {
-      name: 'Medio Desafiante #2',
-      clues:
-        '2...8.3..' +
-        '.6..7..84' +
-        '.3.5..2.9' +
-        '...1.54.8' +
-        '.........' +
-        '4.27.6...' +
-        '3.1..7.4.' +
-        '72..4..6.' +
-        '..4.1...3'
-    }
-  ],
-  dificil: [
-    {
-      name: 'Difícil Maestro #1',
-      clues:
-        '..5...9..' +
-        '.2....7..' +
-        '...4.8...' +
-        '..8.1.5..' +
-        '1.3...2.9' +
-        '..9.7.4..' +
-        '...6.3...' +
-        '..7....1.' +
-        '..4...6..'
-    },
-    {
-      name: 'Difícil Experto #2',
-      clues:
-        '8........' +
-        '..36.....' +
-        '.7..9.2..' +
-        '.5...7...' +
-        '....457..' +
-        '...1...3.' +
-        '..1....68' +
-        '..85...1.' +
-        '.9....4..'
-    }
-  ]
+const fs = require('fs');
+const path = require('path');
+
+let RAW_PUZZLES = null;
+try {
+  RAW_PUZZLES = require('./sudokuPuzzles.json');
+} catch (_) {
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, 'sudokuPuzzles.json'), 'utf8');
+    RAW_PUZZLES = JSON.parse(raw);
+  } catch (err) {
+    console.error('Error al cargar sudokuPuzzles.json:', err);
+  }
+}
+
+const diffLabels = {
+  facil: 'Fácil',
+  medio: 'Medio',
+  dificil: 'Difícil'
 };
+
+// Banco de 1000 tablas verificadas por dificultad (3000 tablas en total)
+const PRESET_PUZZLES = {
+  facil: [],
+  medio: [],
+  dificil: []
+};
+
+if (RAW_PUZZLES) {
+  for (const diff of ['facil', 'medio', 'dificil']) {
+    const list = RAW_PUZZLES[diff] || [];
+    PRESET_PUZZLES[diff] = list.map((cluesStr, idx) => ({
+      name: `${diffLabels[diff]} #${idx + 1}`,
+      clues: cluesStr
+    }));
+  }
+}
 
 /**
  * Crea una matriz inicial de 81 celdas para el Sudoku
  * @param {string} difficulty 'facil' | 'medio' | 'dificil' | 'custom'
- * @param {number} [presetIndex=0]
+ * @param {number|null} [presetIndex=null] Si es null, elige aleatoriamente entre las 1000 tablas
  */
-function createSudokuBoard(difficulty = 'facil', presetIndex = 0) {
+function createSudokuBoard(difficulty = 'facil', presetIndex = null) {
   const grid = [];
   let cluesString = '';
+  let selectedIndex = 0;
 
-  if (difficulty !== 'custom' && PRESET_PUZZLES[difficulty]) {
+  if (difficulty !== 'custom' && PRESET_PUZZLES[difficulty] && PRESET_PUZZLES[difficulty].length > 0) {
     const list = PRESET_PUZZLES[difficulty];
-    const item = list[presetIndex % list.length];
+    selectedIndex = (presetIndex !== null && presetIndex !== undefined)
+      ? Math.abs(Number(presetIndex)) % list.length
+      : Math.floor(Math.random() * list.length);
+    const item = list[selectedIndex];
     cluesString = item.clues;
   }
 
@@ -148,6 +97,10 @@ function createSudokuBoard(difficulty = 'facil', presetIndex = 0) {
 
   return {
     difficulty,
+    puzzleIndex: selectedIndex,
+    puzzleName: (PRESET_PUZZLES[difficulty] && PRESET_PUZZLES[difficulty][selectedIndex])
+      ? PRESET_PUZZLES[difficulty][selectedIndex].name
+      : `${difficulty.toUpperCase()}`,
     grid,
     solved: false,
     errors: [],

@@ -995,6 +995,8 @@ function serializeRoom(room) {
     sudoku: room.sudoku
       ? {
           difficulty: room.sudoku.difficulty,
+          puzzleName: room.sudoku.puzzleName,
+          puzzleIndex: room.sudoku.puzzleIndex,
           grid: room.sudoku.grid,
           solved: room.sudoku.solved || false,
           errors: room.sudoku.errors || [],
@@ -2161,9 +2163,9 @@ io.on('connection', (socket) => {
     const diff = difficulty || 'facil';
     room.settings.sudokuDifficulty = diff;
     room.sudoku = createSudokuBoard(diff);
-    addLog(room, `🔄 El líder cargó un nuevo tablero Sudoku (${diff.toUpperCase()}).`, 'system');
+    addLog(room, `🔄 El líder cargó un nuevo tablero de Sudoku (${room.sudoku.puzzleName || diff.toUpperCase()}).`, 'system');
     broadcastRoomState(room);
-    if (callback) callback({ ok: true });
+    if (callback) callback({ ok: true, puzzleName: room.sudoku.puzzleName });
   });
 
   socket.on('sudoku_check', (callback) => {
@@ -2425,7 +2427,7 @@ function startSudokuGame(room) {
   room.winner = null;
   addLog(
     room,
-    `🧩 ¡Comenzó el Sudoku Colaborativo (${diff.toUpperCase()})! El líder define los números definitivos y los jugadores secundarios colocan notas y sugerencias.`,
+    `🧩 ¡Comenzó el Sudoku Colaborativo (${room.sudoku.puzzleName || diff.toUpperCase()})! El líder define los números definitivos y los jugadores secundarios colocan notas y sugerencias.`,
     'success'
   );
 }

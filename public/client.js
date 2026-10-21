@@ -3392,6 +3392,11 @@ function renderSudokuGame(state) {
     presetSel.value = su.difficulty || 'facil';
   }
 
+  const puzzleBadge = document.getElementById('sudoku-current-puzzle-name');
+  if (puzzleBadge) {
+    puzzleBadge.textContent = su.puzzleName || 'Sudoku';
+  }
+
   // Renderizar las 81 celdas del Sudoku
   const gridEl = document.getElementById('sudoku-grid');
   gridEl.innerHTML = '';
