@@ -37,6 +37,28 @@
     </div>
   </div>
 
+  <!-- ================= POPUP FLOTANTE DE PAGO DE ARRIENDO O COBRO (5 SEGUNDOS) ================= -->
+  <div id="payment-popup-overlay" class="payment-popup-overlay hidden" aria-live="assertive" role="alert">
+    <div class="payment-popup-card">
+      <div class="payment-popup-badge" id="payment-popup-badge">💸 COBRO DE ARRIENDO</div>
+      <div class="payment-popup-avatars">
+        <span class="avatar-payer" id="payment-payer-avatar">👤</span>
+        <span class="payment-arrow">➡️ 💰 ➡️</span>
+        <span class="avatar-receiver" id="payment-receiver-avatar">👤</span>
+      </div>
+      <div class="payment-popup-message" id="payment-popup-message">
+        <!-- Alvaro ha caído en la propiedad de Don Farkas y ha pagado $120.000 CLP -->
+      </div>
+      <div class="payment-popup-amount-tag" id="payment-popup-amount">
+        -$0 CLP
+      </div>
+      <div class="payment-popup-timer-bar">
+        <div class="timer-bar-fill" id="payment-timer-fill"></div>
+      </div>
+      <button type="button" id="btn-close-payment-popup" class="payment-popup-close-btn" title="Cerrar">✕</button>
+    </div>
+  </div>
+
   <!-- ================= PANTALLA DE BIENVENIDA / SALAS ONLINE ================= -->
   <main id="screen-auth" class="screen active">
     <div class="hero-backdrop"></div>

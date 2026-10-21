@@ -342,6 +342,14 @@ function advanceTurn(room) {
   }
 }
 
+function broadcastPaymentPopup(room, payload) {
+  if (!io || !room || !room.code) return;
+  io.to(room.code).emit('payment_popup', {
+    ...payload,
+    timestamp: Date.now()
+  });
+}
+
 function evaluateLandingTile(room, player, diceSum, ioInstance) {
   const tile = BOARD_TILES[player.position];
   if (!tile) {
@@ -380,6 +388,18 @@ function evaluateLandingTile(room, player, diceSum, ioInstance) {
         `💸 ${player.name} pagó ${formatCLP(rent)} de arriendo a ${owner.name} en ${tile.name}.`,
         'rent'
       );
+      broadcastPaymentPopup(room, {
+        type: 'rent',
+        payerId: player.id,
+        payerName: player.name,
+        payerAvatar: player.avatar?.icon || '👤',
+        receiverId: owner.id,
+        receiverName: owner.name,
+        receiverAvatar: owner.avatar?.icon || '👤',
+        amount: rent,
+        tileName: tile.name,
+        message: `${player.name} ha caído en la propiedad de ${owner.name} y ha pagado ${formatCLP(rent)}`
+      });
       autoRaiseFundsIfNeeded(room, player);
       room.turnPhase = 'END_TURN';
       return;
@@ -400,6 +420,17 @@ function evaluateLandingTile(room, player, diceSum, ioInstance) {
       `🏛️ ${player.name} pagó ${formatCLP(amount)} en ${tile.name}. Pozo Parque O'Higgins sube a ${formatCLP(room.pot)}.`,
       'warning'
     );
+    broadcastPaymentPopup(room, {
+      type: 'tax',
+      payerId: player.id,
+      payerName: player.name,
+      payerAvatar: player.avatar?.icon || '👤',
+      receiverName: tile.name,
+      receiverAvatar: '🏛️',
+      amount: amount,
+      tileName: tile.name,
+      message: `${player.name} ha caído en ${tile.name} y ha pagado ${formatCLP(amount)}`
+    });
     autoRaiseFundsIfNeeded(room, player);
     room.turnPhase = 'END_TURN';
     return;
@@ -508,6 +539,16 @@ function applyCardAction(room, player, card, diceSum, ioInstance) {
       player.money -= card.amount;
       room.pot += card.amount;
       autoRaiseFundsIfNeeded(room, player);
+      broadcastPaymentPopup(room, {
+        type: 'card',
+        payerName: player.name,
+        payerAvatar: player.avatar?.icon || '👤',
+        receiverName: 'SII / Pozo',
+        receiverAvatar: '🃏',
+        amount: card.amount,
+        tileName: card.title,
+        message: `${player.name} ha sacado "${card.title}" y ha pagado ${formatCLP(card.amount)}`
+      });
       room.turnPhase = 'END_TURN';
       break;
     }
@@ -1287,6 +1328,17 @@ io.on('connection', (socket) => {
     current.inJail = false;
     current.jailTurns = 0;
     addLog(room, `🚓 ${current.name} pagó fianza de ${formatCLP(bail)} y quedó en libertad. ¡Ahora puede lanzar los dados!`, 'success');
+    broadcastPaymentPopup(room, {
+      type: 'bail',
+      payerId: current.id,
+      payerName: current.name,
+      payerAvatar: current.avatar?.icon || '👤',
+      receiverName: 'Comisaría (Fianza)',
+      receiverAvatar: '🚓',
+      amount: bail,
+      tileName: 'Comisaría',
+      message: `${current.name} ha pagado ${formatCLP(bail)} de fianza para salir de la Comisaría`
+    });
     broadcastRoomState(room);
     if (callback) callback({ ok: true });
   });
@@ -2008,4 +2060,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, server, io, rooms };
+module.exports = { app, server, io, rooms, evaluateLandingTile };

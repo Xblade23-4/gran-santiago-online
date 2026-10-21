@@ -51,6 +51,8 @@ let isDiceRollingAnim = false;
 let pendingRoomStateAfterDice = null;
 let pendingCardAfterDice = null;
 let pendingCardAfterWalk = null;
+let pendingPaymentPopupAfterWalk = null;
+let paymentPopupTimeoutId = null;
 let cardCountdownIntervalId = null;
 let activeCardId = null;
 let diceIntervalId = null;
@@ -526,6 +528,12 @@ function animatePlayerMovement(player, fromPos, toPos) {
         const cd = pendingCardAfterWalk;
         pendingCardAfterWalk = null;
         showDrawnCardNotification(cd);
+      }
+
+      if (pendingPaymentPopupAfterWalk && (!pendingPaymentPopupAfterWalk.payerId || pendingPaymentPopupAfterWalk.payerId === player.id)) {
+        const pay = pendingPaymentPopupAfterWalk;
+        pendingPaymentPopupAfterWalk = null;
+        showPaymentPopup(pay);
       }
 
       if (currentRoomState) {
@@ -1074,6 +1082,11 @@ function bindUIEvents() {
     closeTopLayer(document.getElementById('property-dialog'));
   });
 
+  // Popup de Pago / Arriendo (cierre manual antes de los 5s)
+  document.getElementById('btn-close-payment-popup')?.addEventListener('click', () => {
+    closePaymentPopup();
+  });
+
   // Modal de Tarjeta Sacada (cierre manual o confirmación antes de los 10s)
   const drawnCardDialog = document.getElementById('drawn-card-dialog');
   document.getElementById('btn-close-drawn-card').addEventListener('click', () => {
@@ -1383,6 +1396,98 @@ socket.on('card_drawn', (payload) => {
 
 socket.on('card_resolved', () => {
   confirmAndCloseDrawnCard(true);
+});
+
+// ================= POPUP FLOTANTE DE PAGO DE ARRIENDO O COBRO (5 SEGUNDOS) =================
+function queueOrShowPaymentPopup(payload) {
+  if (!payload) return;
+  // Si el jugador que paga aún está caminando casilla por casilla, esperar a que aterrice en la propiedad
+  if (payload.payerId && walkingTimers[payload.payerId]) {
+    pendingPaymentPopupAfterWalk = payload;
+    return;
+  }
+  showPaymentPopup(payload);
+}
+
+function showPaymentPopup(payload) {
+  if (!payload) return;
+  const overlay = document.getElementById('payment-popup-overlay');
+  const badgeEl = document.getElementById('payment-popup-badge');
+  const payerAvatarEl = document.getElementById('payment-payer-avatar');
+  const receiverAvatarEl = document.getElementById('payment-receiver-avatar');
+  const msgEl = document.getElementById('payment-popup-message');
+  const amountEl = document.getElementById('payment-popup-amount');
+  const timerFill = document.getElementById('payment-timer-fill');
+
+  if (!overlay) return;
+
+  // Sonido de cobro / pago en caja
+  if (soundEnabled) {
+    playTone(330, 0.08, 'triangle');
+    setTimeout(() => playTone(247, 0.12, 'triangle'), 85);
+  }
+
+  // Título e iconos del popup
+  if (payload.type === 'rent') {
+    badgeEl.textContent = '💸 COBRO DE ARRIENDO';
+  } else if (payload.type === 'tax') {
+    badgeEl.textContent = '🏛️ PAGO DE IMPUESTOS / TAG';
+  } else if (payload.type === 'bail') {
+    badgeEl.textContent = '🚓 PAGO DE FIANZA';
+  } else {
+    badgeEl.textContent = '💳 PAGO / COBRO';
+  }
+
+  payerAvatarEl.textContent = payload.payerAvatar || '👤';
+  receiverAvatarEl.textContent = payload.receiverAvatar || '👤';
+
+  // Mensaje exacto: "x jugador ha caido en la propiedad de x jugador y ha pagado $ cantidad"
+  if (payload.type === 'rent') {
+    msgEl.innerHTML = `<strong>${payload.payerName}</strong> ha caído en la propiedad de <strong>${payload.receiverName}</strong> y ha pagado`;
+  } else if (payload.type === 'tax') {
+    msgEl.innerHTML = `<strong>${payload.payerName}</strong> ha caído en <strong>${payload.tileName || 'Impuestos'}</strong> y ha pagado`;
+  } else {
+    msgEl.innerHTML = payload.message || `<strong>${payload.payerName}</strong> ha pagado`;
+  }
+
+  amountEl.textContent = `-${formatCLP(payload.amount)}`;
+
+  // Reiniciar barra de temporizador de 5 segundos
+  if (timerFill) {
+    timerFill.style.animation = 'none';
+    void timerFill.offsetWidth;
+    timerFill.style.animation = 'timerProgress 5s linear forwards';
+  }
+
+  overlay.classList.remove('hidden', 'closing');
+
+  if (paymentPopupTimeoutId) {
+    clearTimeout(paymentPopupTimeoutId);
+    paymentPopupTimeoutId = null;
+  }
+
+  // Desaparece automáticamente en exactamente 5 segundos (5000 ms)
+  paymentPopupTimeoutId = setTimeout(() => {
+    closePaymentPopup();
+  }, 5000);
+}
+
+function closePaymentPopup() {
+  const overlay = document.getElementById('payment-popup-overlay');
+  if (!overlay) return;
+  overlay.classList.add('closing');
+  setTimeout(() => {
+    overlay.classList.add('hidden');
+    overlay.classList.remove('closing');
+  }, 320);
+  if (paymentPopupTimeoutId) {
+    clearTimeout(paymentPopupTimeoutId);
+    paymentPopupTimeoutId = null;
+  }
+}
+
+socket.on('payment_popup', (payload) => {
+  queueOrShowPaymentPopup(payload);
 });
 
 socket.on('cual_es_point', ({ playerId, playerName, symbol }) => {

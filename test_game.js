@@ -1,6 +1,6 @@
 const assert = require('assert');
 const { io: Client } = require('socket.io-client');
-const { server, rooms } = require('./server');
+const { server, io, rooms, evaluateLandingTile } = require('./server');
 
 async function runTests() {
   console.log('🧪 Iniciando pruebas automatizadas de Gran Santiago Online...');
@@ -83,7 +83,23 @@ async function runTests() {
     assert.strictEqual(room.properties[1].houses, 1, 'Av. Pajaritos debe tener 1 casa');
     console.log('✅ Construcción de casas y monopolio por sector verificados.');
 
-    // 6b. Verificar que al caer en tarjeta "?" espera confirmación (o timeout de 10s) antes de mover al jugador
+    // 6b. Verificar que al caer en propiedad ajena se emite payment_popup con mensaje de 5s
+    const popupPromise = new Promise((resolve) => {
+      host.once('payment_popup', resolve);
+    });
+    const p2 = room.players[1];
+    p2.position = 1; // Av. Pajaritos (propiedad de p1 con 1 casa)
+    evaluateLandingTile(room, p2, 6, io);
+    const popupData = await popupPromise;
+    assert.strictEqual(popupData.type, 'rent', 'El popup debe ser de tipo rent');
+    assert.strictEqual(popupData.receiverName, 'Alvaro', 'El receptor del arriendo debe ser Alvaro');
+    assert.ok(
+      popupData.message.includes('ha caído en la propiedad de Alvaro y ha pagado'),
+      'El mensaje debe decir "x jugador ha caido en la propiedad de x jugador y ha pagado $ cantidad"'
+    );
+    console.log('✅ Popup de cobro de arriendo al caer en propiedad ajena (5s) verificado.');
+
+    // 6c. Verificar que al caer en tarjeta "?" espera confirmación (o timeout de 10s) antes de mover al jugador
     p1.position = 7; // Casilla ¡Aló Santiago! (?)
     room.turnPhase = 'CARD_CONFIRM';
     room.pendingCard = {
