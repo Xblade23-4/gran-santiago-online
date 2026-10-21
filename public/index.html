@@ -282,6 +282,9 @@
   <section id="screen-game" class="screen">
     <!-- Arena embebida de Crucigrama Party / Doodle Party cuando ganan la votación -->
     <div id="gameparty-arena" class="gameparty-arena hidden">
+      <button type="button" id="btn-gp-vote-abandon" class="btn btn-danger-outline btn-sm gp-abandon-floating">
+        🏳️ Votar Abandonar Juego (0/1)
+      </button>
       <iframe id="gameparty-frame" title="Crucigrama Party y Doodle Party"></iframe>
     </div>
 
@@ -299,6 +302,11 @@
           </div>
         </div>
 
+        <!-- Botón de Votación para Abandonar Partida y Volver al Lobby Unificado -->
+        <button type="button" id="btn-vote-abandon" class="btn btn-danger-outline btn-sm btn-block">
+          🏳️ Votar Abandonar Juego (0/1)
+        </button>
+
         <div class="panel-box">
           <h3 class="panel-title" id="sidebar-players-title">👥 Magnates en Competencia</h3>
           <div id="players-list" class="players-list"></div>
@@ -313,16 +321,16 @@
             <p class="empty-small">Aún no tienes propiedades. ¡Lanza los dados y compra comunas!</p>
           </div>
           <button id="btn-return-lobby-santiago" class="btn btn-secondary btn-xs hidden" style="margin-top:8px;">
-            🔄 Volver al Lobby (Votar otro juego)
+            🔄 Volver al Lobby (Anfitrión)
           </button>
         </div>
 
         <div class="panel-box my-portfolio-box hidden" id="cuales-rules-panel">
           <h3 class="panel-title">🔍 Reglas de ¿Cuál es?</h3>
           <ul class="cuales-rules-list">
-            <li>🎯 Entre <strong>Tu Carta</strong> y la <strong>Carta Central</strong> siempre hay <strong>1 único objeto repetido</strong>.</li>
-            <li>👆 Haz clic sobre ese dibujo (en tu carta o en la central) antes que los demás para llevarte la carta.</li>
-            <li>❄️ <strong>¡No adivines al azar!</strong> Si haces clic en un dibujo que no coincide, quedarás <strong>congelado por 3 segundos</strong> sin poder jugar.</li>
+            <li>🎯 Entre <strong>Tu Carta</strong> y la <strong>Carta Central</strong> siempre hay <strong>1 único icono repetido</strong>.</li>
+            <li>👆 Haz clic sobre ese icono (en tu carta o en la central) antes que los demás para llevarte la carta.</li>
+            <li>❄️ <strong>¡No adivines al azar!</strong> Si haces clic en un icono que no coincide, quedarás <strong>congelado por 3 segundos</strong> sin poder jugar.</li>
           </ul>
           <button id="btn-return-lobby" class="btn btn-secondary btn-sm hidden" style="margin-top:auto;">
             🔄 Volver a la Sala de Espera
@@ -339,10 +347,27 @@
 
           <div class="cuales-header">
             <div class="cuales-title-badge">🔍 ¿CUÁL ES? • MESA EN VIVO</div>
+            <button type="button" id="btn-cuales-vote-abandon" class="btn btn-danger-outline btn-xs">
+              🏳️ Votar Abandonar (0/1)
+            </button>
           </div>
 
           <div id="cuales-last-match" class="cuales-last-match">
-            ¡Encuentra y haz clic en el único dibujo idéntico entre ambas cartas!
+            ¡Encuentra y haz clic en el único icono idéntico entre ambas cartas!
+          </div>
+
+          <!-- Pestaña / Modal de Fin del Juego ¿Cuál es? para terminar y volver a la sala -->
+          <div id="cuales-gameover-overlay" class="cuales-gameover-overlay hidden">
+            <div class="cuales-gameover-card">
+              <div class="cgo-badge">🏁 ¡SE ACABÓ EL MAZO DE CARTAS!</div>
+              <div id="cuales-winner-avatar" class="cgo-avatar">🏆</div>
+              <h2 id="cuales-winner-title" class="cgo-title">¡Ganador de la Partida!</h2>
+              <p id="cuales-winner-subtitle" class="cgo-subtitle">Dominó la mesa con más cartas ganadas</p>
+              <div id="cuales-gameover-ranking" class="cgo-ranking"></div>
+              <button type="button" id="btn-cuales-finish-return" class="btn btn-primary btn-lg btn-block">
+                🔄 Terminar Juego y Volver a la Sala
+              </button>
+            </div>
           </div>
 
           <!-- Overlay de Penalización de 3 Segundos -->

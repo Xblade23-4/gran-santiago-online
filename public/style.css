@@ -2255,19 +2255,109 @@ dialog.modern-dialog[open]:where(:not([data-closing]))::backdrop {
 }
 
 .cuales-symbol-btn .sym-emoji {
-  font-size: clamp(1.55rem, 3.2vh, 2.15rem);
+  font-size: clamp(1.9rem, 3.9vh, 2.55rem);
   line-height: 1;
 }
 
-.cuales-symbol-btn .sym-label {
-  font-size: 0.54rem;
+/* Botón de Votar Abandonar Juego */
+.voted-abandon {
+  background: rgba(239, 68, 68, 0.25) !important;
+  border-color: #f87171 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.35);
+}
+
+.gp-abandon-floating {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 9400;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(8px);
+}
+
+/* Pestaña / Modal de Fin del Juego ¿Cuál es? */
+.cuales-gameover-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  background: rgba(8, 13, 26, 0.86);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.cuales-gameover-card {
+  background: linear-gradient(160deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+  border: 2px solid #facc15;
+  border-radius: 20px;
+  padding: 1.6rem 2rem;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 35px rgba(250, 204, 21, 0.28);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.cgo-badge {
+  background: rgba(250, 204, 21, 0.18);
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  color: #fde047;
+  font-size: 0.74rem;
   font-weight: 800;
-  color: #334155;
-  margin-top: 2px;
-  max-width: 90%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.85rem;
+  border-radius: 999px;
+}
+
+.cgo-avatar {
+  font-size: 3.4rem;
+  line-height: 1.1;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
+}
+
+.cgo-title {
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.cgo-subtitle {
+  font-size: 0.88rem;
+  color: #cbd5e1;
+}
+
+.cgo-ranking {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.65rem 0 0.85rem;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.cgo-rank-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-glass);
+  border-radius: 10px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.cgo-rank-row.first-place {
+  border-color: #facc15;
+  background: rgba(250, 204, 21, 0.14);
+  color: #fde047;
 }
 
 /* Reproductor Flotante de Canción IA */

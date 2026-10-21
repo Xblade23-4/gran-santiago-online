@@ -838,12 +838,32 @@ function bindUIEvents() {
   });
 
   // Volver al Lobby Unificado desde cualquier juego
-  document.getElementById('btn-return-lobby')?.addEventListener('click', () => {
-    socket.emit('return_to_lobby');
-  });
-  document.getElementById('btn-return-lobby-santiago')?.addEventListener('click', () => {
-    socket.emit('return_to_lobby');
-  });
+  const returnToLobbyHandler = () => {
+    socket.emit('return_to_lobby', {}, (res) => {
+      if (res && !res.ok && res.error) showToast(res.error);
+    });
+  };
+  document.getElementById('btn-return-lobby')?.addEventListener('click', returnToLobbyHandler);
+  document.getElementById('btn-return-lobby-santiago')?.addEventListener('click', returnToLobbyHandler);
+  document.getElementById('btn-cuales-finish-return')?.addEventListener('click', returnToLobbyHandler);
+
+  // Votar para Abandonar Juego y Volver a la Sala de Espera
+  const voteAbandonHandler = () => {
+    socket.emit('vote_abandon_game', {}, (res) => {
+      if (res && res.ok) {
+        if (res.abandoned) {
+          showToast('🏳️ Partida finalizada por votación. ¡De vuelta en la Sala!');
+        } else if (res.voted) {
+          showToast(`🏳️ Votaste por abandonar el juego (${res.votes}/${res.required})`);
+        } else {
+          showToast(`↩️ Retiraste tu voto de abandonar (${res.votes}/${res.required})`);
+        }
+      }
+    });
+  };
+  document.getElementById('btn-vote-abandon')?.addEventListener('click', voteAbandonHandler);
+  document.getElementById('btn-cuales-vote-abandon')?.addEventListener('click', voteAbandonHandler);
+  document.getElementById('btn-gp-vote-abandon')?.addEventListener('click', voteAbandonHandler);
 
   // Escuchar mensajes desde el iframe de Crucigrama Party / Doodle Party
   window.addEventListener('message', (e) => {
@@ -1444,11 +1464,7 @@ function renderCualEsCircleCard(containerId, symbolIds, cardSeed = 0) {
     btn.style.left = `${slot.x}%`;
     btn.style.top = `${slot.y}%`;
     btn.style.transform = `translate(-50%, -50%) rotate(${rot}deg) scale(${slot.scale})`;
-    btn.title = `Hacer clic en ${sym.name}`;
-    btn.innerHTML = `
-      <span class="sym-emoji">${sym.icon}</span>
-      <span class="sym-label">${sym.name}</span>
-    `;
+    btn.innerHTML = `<span class="sym-emoji">${sym.icon}</span>`;
 
     btn.addEventListener('click', () => {
       if (Date.now() < myPenaltyUntil || Date.now() < cualesCardTransitionUntil) return;
@@ -1622,6 +1638,22 @@ function renderGame(state) {
   const isGameParty = state.gameType === 'crossword' || state.gameType === 'pictionary';
   const isHost = state.hostId === myPlayerId;
 
+  // Actualizar estado del botón de Votar Abandonar Juego en todas las vistas
+  const abandonVotes = state.abandonVotes || [];
+  const abandonRequired = state.abandonRequired || 1;
+  const iVotedAbandon = abandonVotes.includes(myPlayerId);
+  const abandonText = iVotedAbandon
+    ? `✓ Votaste Abandonar (${abandonVotes.length}/${abandonRequired})`
+    : `🏳️ Votar Abandonar Juego (${abandonVotes.length}/${abandonRequired})`;
+
+  ['btn-vote-abandon', 'btn-cuales-vote-abandon', 'btn-gp-vote-abandon'].forEach((btnId) => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.textContent = abandonText;
+      btn.classList.toggle('voted-abandon', iVotedAbandon);
+    }
+  });
+
   const gamePartyArenaEl = document.getElementById('gameparty-arena');
   const mainGameLayoutEl = document.getElementById('main-game-layout');
 
@@ -1658,10 +1690,10 @@ function renderGame(state) {
   if (logPanelBox) logPanelBox.classList.toggle('hidden', isCualEs);
 
   if (returnLobbyBtn) {
-    returnLobbyBtn.classList.toggle('hidden', !isHost);
+    returnLobbyBtn.classList.toggle('hidden', !isHost && state.status !== 'finished');
   }
   if (returnLobbySantiagoBtn) {
-    returnLobbySantiagoBtn.classList.toggle('hidden', !isHost);
+    returnLobbySantiagoBtn.classList.toggle('hidden', !isHost && state.status !== 'finished');
   }
 
   if (sidebarTitleEl) {
@@ -1962,12 +1994,47 @@ function renderCualEsGame(state) {
   renderCualEsTableSeats(state);
 
   const matchBanner = document.getElementById('cuales-last-match');
+  const gameOverOverlay = document.getElementById('cuales-gameover-overlay');
+
   if (state.status === 'finished' && state.winner) {
     matchBanner.innerHTML = `🏆 ¡PARTIDA TERMINADA! Ganador: <strong>${state.winner.avatar.icon} ${state.winner.name}</strong> con ${ce.scores?.[state.winner.id] || 0} cartas!`;
-  } else if (ce.lastMatch) {
-    matchBanner.innerHTML = `⚡ Última carta ganada por <strong>${ce.lastMatch.playerAvatar?.icon || ''} ${ce.lastMatch.playerName}</strong> con <strong>${ce.lastMatch.symbol.icon} ${ce.lastMatch.symbol.name}</strong>`;
+
+    if (gameOverOverlay) {
+      gameOverOverlay.classList.remove('hidden');
+      const winAvatarEl = document.getElementById('cuales-winner-avatar');
+      const winTitleEl = document.getElementById('cuales-winner-title');
+      const winSubEl = document.getElementById('cuales-winner-subtitle');
+      const rankingEl = document.getElementById('cuales-gameover-ranking');
+
+      if (winAvatarEl) winAvatarEl.textContent = state.winner.avatar?.icon || '🏆';
+      if (winTitleEl) winTitleEl.textContent = `¡${state.winner.name} gana ¿Cuál es?!`;
+      if (winSubEl) {
+        winSubEl.textContent = `Campeón con ${ce.scores?.[state.winner.id] || 0} cartas ganadas`;
+      }
+      if (rankingEl) {
+        rankingEl.innerHTML = '';
+        const ranked = [...state.players].sort(
+          (a, b) => (ce.scores?.[b.id] || 0) - (ce.scores?.[a.id] || 0)
+        );
+        ranked.forEach((p, idx) => {
+          const row = document.createElement('div');
+          row.className = 'cgo-rank-row' + (idx === 0 ? ' first-place' : '');
+          const medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `#${idx + 1}`));
+          row.innerHTML = `
+            <span>${medal} ${p.avatar?.icon || ''} ${p.name} ${p.id === myPlayerId ? '(Tú)' : ''}</span>
+            <strong>${ce.scores?.[p.id] || 0} 🃏</strong>
+          `;
+          rankingEl.appendChild(row);
+        });
+      }
+    }
   } else {
-    matchBanner.textContent = '¡Encuentra y haz clic en el único dibujo idéntico entre ambas cartas!';
+    if (gameOverOverlay) gameOverOverlay.classList.add('hidden');
+    if (ce.lastMatch) {
+      matchBanner.innerHTML = `⚡ Última carta ganada por <strong>${ce.lastMatch.playerAvatar?.icon || ''} ${ce.lastMatch.playerName}</strong> con <strong>${ce.lastMatch.symbol.icon}</strong>`;
+    } else {
+      matchBanner.textContent = '¡Encuentra y haz clic en el único icono idéntico entre ambas cartas!';
+    }
   }
 
   // Verificar si tengo penalización activa

@@ -157,6 +157,7 @@ function createRoom(hostPlayer, customCode, settings = {}) {
       }
     ],
     chat: [],
+    abandonVotes: [],
     winner: null
   };
 
@@ -739,12 +740,49 @@ function scheduleBotTurn(room) {
   }, 1000);
 }
 
+function getRequiredAbandonVotes(room) {
+  const humanPlayers = (room.players || []).filter((p) => !p.isBot && p.connected !== false);
+  const count = Math.max(1, humanPlayers.length);
+  return Math.floor(count / 2) + 1;
+}
+
+function resetRoomToLobby(room, reasonText = '🔄 La sala regresó al Lobby para elegir un nuevo juego.') {
+  if (!room) return;
+  if (room.cualEsBotTimer) {
+    clearInterval(room.cualEsBotTimer);
+    room.cualEsBotTimer = null;
+  }
+  if (room.cardConfirmTimer) {
+    clearTimeout(room.cardConfirmTimer);
+    room.cardConfirmTimer = null;
+  }
+  room.pendingCard = null;
+  room.pendingBuyTileId = null;
+  room.abandonVotes = [];
+  room.status = 'lobby';
+  room.winner = null;
+  room.properties = createInitialProperties();
+  room.trades = [];
+  room.players.forEach((p) => {
+    p.money = room.settings.startingMoney;
+    p.position = 0;
+    p.inJail = false;
+    p.jailTurns = 0;
+    p.bankrupt = false;
+  });
+  addLog(room, reasonText, 'system');
+  broadcastRoomState(room);
+  broadcastPublicRooms();
+}
+
 function serializeRoom(room) {
   return {
     code: room.code,
     hostId: room.hostId,
     gameType: room.gameType || 'santiago',
     votes: room.votes || {},
+    abandonVotes: room.abandonVotes || [],
+    abandonRequired: getRequiredAbandonVotes(room),
     status: room.status,
     settings: room.settings,
     players: room.players.map((p) => ({
@@ -1078,6 +1116,7 @@ io.on('connection', (socket) => {
 
     room.status = 'playing';
     room.winner = null;
+    room.abandonVotes = [];
 
     if (room.gameType === 'crossword' || room.gameType === 'pictionary') {
       await gamePartyManager.startOrSyncUnifiedRoom({
@@ -1137,34 +1176,66 @@ io.on('connection', (socket) => {
     if (callback) callback(res);
   });
 
-  // Volver al Lobby al terminar una partida
-  socket.on('return_to_lobby', () => {
+  // Volver al Lobby al terminar una partida (cualquier jugador si ya terminó, o el anfitrión en cualquier momento)
+  socket.on('return_to_lobby', (_, callback) => {
     const room = rooms.get(currentRoomCode);
-    if (!room || room.hostId !== currentPlayerId) return;
-    if (room.cualEsBotTimer) {
-      clearInterval(room.cualEsBotTimer);
-      room.cualEsBotTimer = null;
+    if (!room) return;
+    if (room.status !== 'finished' && room.hostId !== currentPlayerId) {
+      if (typeof callback === 'function') {
+        callback({ ok: false, error: 'Usa el botón de Votar Abandonar Juego durante la partida.' });
+      }
+      return;
     }
-    if (room.cardConfirmTimer) {
-      clearTimeout(room.cardConfirmTimer);
-      room.cardConfirmTimer = null;
+    resetRoomToLobby(room, '🔄 La partida finalizó y la sala regresó al Lobby para elegir un nuevo juego.');
+    if (typeof callback === 'function') callback({ ok: true });
+  });
+
+  // Votar para abandonar la partida actual y volver todos al Lobby Unificado
+  socket.on('vote_abandon_game', (_, callback) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || room.status === 'lobby') return;
+    const player = room.players.find((p) => p.id === currentPlayerId);
+    if (!player) return;
+
+    if (!Array.isArray(room.abandonVotes)) {
+      room.abandonVotes = [];
     }
-    room.pendingCard = null;
-    room.pendingBuyTileId = null;
-    room.status = 'lobby';
-    room.winner = null;
-    room.properties = createInitialProperties();
-    room.trades = [];
-    room.players.forEach((p) => {
-      p.money = room.settings.startingMoney;
-      p.position = 0;
-      p.inJail = false;
-      p.jailTurns = 0;
-      p.bankrupt = false;
-    });
-    addLog(room, '🔄 El anfitrión regresó la sala al Lobby para una nueva partida.', 'system');
+
+    const idx = room.abandonVotes.indexOf(player.id);
+    let voted = false;
+    if (idx === -1) {
+      room.abandonVotes.push(player.id);
+      voted = true;
+    } else {
+      room.abandonVotes.splice(idx, 1);
+      voted = false;
+    }
+
+    const required = getRequiredAbandonVotes(room);
+    const currentVotes = room.abandonVotes.length;
+
+    if (currentVotes >= required) {
+      resetRoomToLobby(
+        room,
+        `🏳️ Votación de abandono aprobada (${currentVotes}/${required}). Todos regresaron a la Sala de Espera.`
+      );
+      if (typeof callback === 'function') {
+        callback({ ok: true, abandoned: true, votes: 0, required });
+      }
+      return;
+    }
+
+    addLog(
+      room,
+      voted
+        ? `🏳️ ${player.avatar.icon} ${player.name} votó por abandonar el juego y volver a la sala (${currentVotes}/${required}).`
+        : `↩️ ${player.avatar.icon} ${player.name} retiró su voto de abandonar (${currentVotes}/${required}).`,
+      'warning'
+    );
     broadcastRoomState(room);
-    broadcastPublicRooms();
+    if (typeof callback === 'function') {
+      callback({ ok: true, abandoned: false, voted, votes: currentVotes, required });
+    }
   });
 
   // Lanzar Dados

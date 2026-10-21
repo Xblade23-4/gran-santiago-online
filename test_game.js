@@ -195,6 +195,16 @@ async function runTests() {
     assert.strictEqual(unifiedRoom.status, 'playing', 'La sala unificada pasa a estado playing');
     console.log('✅ Lobby Unificado con Votación en vivo (4 juegos) y Chat de Sala verificado.');
 
+    // 9. Probar votación para abandonar juego (2 de 3 jugadores humanos votan abandonar -> vuelve al Lobby)
+    const ab1 = await new Promise((r) => uGuest1.emit('vote_abandon_game', {}, r));
+    assert.strictEqual(ab1.ok, true, 'Primer voto de abandono registrado');
+    assert.strictEqual(ab1.abandoned, false, 'Con 1/2 votos aún no abandona');
+    const ab2 = await new Promise((r) => uGuest2.emit('vote_abandon_game', {}, r));
+    assert.strictEqual(ab2.ok, true, 'Segundo voto alcanza mayoría');
+    assert.strictEqual(ab2.abandoned, true, 'Con mayoría de votos se abandona la partida');
+    assert.strictEqual(unifiedRoom.status, 'lobby', 'La sala regresa automáticamente al estado lobby');
+    console.log('✅ Botón de Votar Abandonar Juego y retorno automático al Lobby verificado.');
+
     console.log('\n🎉 ¡TODAS LAS PRUEBAS AUTOMATIZADAS PASARON EXITOSAMENTE!');
   } finally {
     clients.forEach((c) => c.close());
