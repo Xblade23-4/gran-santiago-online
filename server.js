@@ -19,10 +19,19 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Si alguien abre /?room=XXXX (enlace de Crucigrama o Doodle Party), redirigir a /gameparty/?room=XXXX
+// Si alguien abre /?room=XXXX, redirigir al lobby unificado /?sala=XXXX
 app.get('/', (req, res, next) => {
   if (req.query && req.query.room) {
-    return res.redirect(`/gameparty/?room=${encodeURIComponent(req.query.room)}`);
+    return res.redirect(`/?sala=${encodeURIComponent(req.query.room)}`);
+  }
+  next();
+});
+
+// Si alguien entra a /gameparty/ directamente sin autojoin=1 (es decir, fuera del lobby unificado), redirigir a /
+app.get(['/gameparty', '/gameparty/'], (req, res, next) => {
+  if (!req.query || req.query.autojoin !== '1') {
+    const code = req.query?.room || req.query?.sala;
+    return res.redirect(code ? `/?sala=${encodeURIComponent(code)}` : '/');
   }
   next();
 });
@@ -68,21 +77,59 @@ function createInitialProperties() {
   return props;
 }
 
+const VALID_GAME_TYPES = ['santiago', 'cual_es', 'crossword', 'pictionary'];
+const GAME_LABELS = {
+  santiago: '🚇 Gran Santiago Online',
+  cual_es: '🔍 ¿Cuál es?',
+  crossword: '🧩 Crucigrama Party',
+  pictionary: '🎨 Doodle Party'
+};
+
+function recalculateWinningGameVote(room, preferredType = null) {
+  if (!room.votes) room.votes = {};
+  const counts = { santiago: 0, cual_es: 0, crossword: 0, pictionary: 0 };
+  room.players.forEach((p) => {
+    const v = room.votes[p.id];
+    if (v && counts[v] !== undefined) {
+      counts[v] += 1;
+    }
+  });
+
+  let bestType =
+    preferredType && counts[preferredType] !== undefined
+      ? preferredType
+      : (room.gameType || 'santiago');
+  let maxVotes = counts[bestType] || 0;
+
+  for (const gt of VALID_GAME_TYPES) {
+    if (counts[gt] > maxVotes) {
+      maxVotes = counts[gt];
+      bestType = gt;
+    }
+  }
+
+  room.gameType = bestType;
+  return bestType;
+}
+
 function createRoom(hostPlayer, customCode, settings = {}) {
   const code = customCode || generateRoomCode();
   const initialMoney = Number(settings.startingMoney) || 1500000;
   const passGoMoney = Number(settings.passGoMoney) || 200000;
-  const gameType = settings.gameType === 'cual_es' ? 'cual_es' : 'santiago';
+  const gameType = VALID_GAME_TYPES.includes(settings.gameType) ? settings.gameType : 'santiago';
 
   const room = {
     code,
     hostId: hostPlayer.id,
-    gameType, // 'santiago' | 'cual_es'
+    gameType, // 'santiago' | 'cual_es' | 'crossword' | 'pictionary'
+    votes: { [hostPlayer.id]: gameType },
     status: 'lobby', // 'lobby' | 'playing' | 'finished'
     settings: {
       startingMoney: initialMoney,
       passGoMoney: passGoMoney,
-      maxPlayers: 8
+      maxPlayers: 8,
+      category: settings.category || 'todo_tipo',
+      difficulty: settings.difficulty || 'Fácil'
     },
     players: [hostPlayer],
     turnIndex: 0,
@@ -105,7 +152,7 @@ function createRoom(hostPlayer, customCode, settings = {}) {
       {
         id: Date.now() + '-' + Math.random(),
         time: new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
-        text: `¡Sala ${code} creada (${gameType === 'cual_es' ? '¿Cuál es?' : 'Gran Santiago'})! Esperando jugadores (2 a 8)...`,
+        text: `¡Sala ${code} creada (${GAME_LABELS[gameType]})! Vota por tu juego favorito y chatea en la sala.`,
         type: 'system'
       }
     ],
@@ -697,6 +744,7 @@ function serializeRoom(room) {
     code: room.code,
     hostId: room.hostId,
     gameType: room.gameType || 'santiago',
+    votes: room.votes || {},
     status: room.status,
     settings: room.settings,
     players: room.players.map((p) => ({
@@ -783,7 +831,7 @@ io.on('connection', (socket) => {
   });
 
   // Crear sala nueva
-  socket.on('create_room', ({ playerName, avatarId, startingMoney, gameType, playerId }, callback) => {
+  socket.on('create_room', ({ playerName, avatarId, startingMoney, gameType, category, difficulty, playerId }, callback) => {
     const cleanName = (playerName || 'Santiaguino').trim().slice(0, 20) || 'Santiaguino';
     const pid = playerId || 'p_' + Math.random().toString(36).substring(2, 10);
     const chosenAvatar = PLAYER_AVATARS.find((a) => a.id === avatarId) || PLAYER_AVATARS[0];
@@ -803,7 +851,7 @@ io.on('connection', (socket) => {
       isBot: false
     };
 
-    const room = createRoom(hostPlayer, null, { startingMoney: initCash, gameType });
+    const room = createRoom(hostPlayer, null, { startingMoney: initCash, gameType, category, difficulty });
     currentRoomCode = room.code;
     currentPlayerId = pid;
     socket.join(room.code);
@@ -813,16 +861,61 @@ io.on('connection', (socket) => {
     if (callback) callback({ ok: true, roomCode: room.code, playerId: pid, state: serializeRoom(room) });
   });
 
-  // Cambiar modo de juego en el Lobby (Gran Santiago vs ¿Cuál es?)
-  socket.on('set_game_type', ({ gameType }) => {
+  // Votar por cualquiera de los 4 juegos en el Lobby Unificado
+  socket.on('vote_game', ({ gameType }, callback) => {
     const room = rooms.get(currentRoomCode);
-    if (!room || room.status !== 'lobby' || room.hostId !== currentPlayerId) return;
-    room.gameType = gameType === 'cual_es' ? 'cual_es' : 'santiago';
+    if (!room || room.status !== 'lobby') return;
+    if (!VALID_GAME_TYPES.includes(gameType)) return;
+    const player = room.players.find((p) => p.id === currentPlayerId);
+    if (!player) return;
+
+    if (!room.votes) room.votes = {};
+    room.votes[player.id] = gameType;
+    const winnerType = recalculateWinningGameVote(room, gameType);
     addLog(
       room,
-      `🎮 El anfitrión cambió el juego a: ${room.gameType === 'cual_es' ? '🔍 ¿Cuál es? (Agilidad Visual)' : '🚇 Gran Santiago Online'}.`,
+      `🗳️ ${player.avatar.icon} ${player.name} votó por ${GAME_LABELS[gameType]}. Más votado: ${GAME_LABELS[winnerType]}.`,
       'system'
     );
+    broadcastRoomState(room);
+    broadcastPublicRooms();
+    if (callback) callback({ ok: true, gameType: winnerType, votes: room.votes });
+  });
+
+  // Cambiar modo de juego en el Lobby (compatible con votación y selector directo)
+  socket.on('set_game_type', ({ gameType }) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || room.status !== 'lobby') return;
+    const validType = VALID_GAME_TYPES.includes(gameType) ? gameType : 'santiago';
+    if (!room.votes) room.votes = {};
+    room.votes[currentPlayerId] = validType;
+    const winnerType = recalculateWinningGameVote(room, validType);
+    addLog(
+      room,
+      `🎮 Juego seleccionado en la sala: ${GAME_LABELS[winnerType]}.`,
+      'system'
+    );
+    broadcastRoomState(room);
+    broadcastPublicRooms();
+  });
+
+  // Actualizar ajustes de la sala en el Lobby (capital CLP, categoría o dificultad)
+  socket.on('update_lobby_settings', ({ startingMoney, category, difficulty }) => {
+    const room = rooms.get(currentRoomCode);
+    if (!room || room.status !== 'lobby' || room.hostId !== currentPlayerId) return;
+    if (startingMoney !== undefined) {
+      const money = Number(startingMoney) || 1500000;
+      room.settings.startingMoney = money;
+      room.players.forEach((p) => {
+        p.money = money;
+      });
+    }
+    if (category !== undefined) {
+      room.settings.category = category;
+    }
+    if (difficulty !== undefined) {
+      room.settings.difficulty = difficulty;
+    }
     broadcastRoomState(room);
     broadcastPublicRooms();
   });
@@ -886,6 +979,12 @@ io.on('connection', (socket) => {
     };
 
     room.players.push(newPlayer);
+    if (!room.votes) room.votes = {};
+    if (!room.votes[newPlayer.id]) {
+      room.votes[newPlayer.id] = room.gameType || 'santiago';
+    }
+    recalculateWinningGameVote(room);
+
     currentRoomCode = room.code;
     currentPlayerId = pid;
     socket.join(room.code);
@@ -943,33 +1042,66 @@ io.on('connection', (socket) => {
     const idx = room.players.findIndex((p) => p.id === targetPlayerId);
     if (idx !== -1) {
       const removed = room.players.splice(idx, 1)[0];
+      if (room.votes) delete room.votes[removed.id];
+      recalculateWinningGameVote(room);
       addLog(room, `${removed.name} salió de la sala.`, 'system');
       broadcastRoomState(room);
       broadcastPublicRooms();
     }
   });
 
-  // Iniciar partida (2 a 8 jugadores)
-  socket.on('start_game', (_, callback) => {
+  // Iniciar partida (unificada para los 4 juegos)
+  socket.on('start_game', async (options, callback) => {
+    const cb = typeof options === 'function' ? options : callback;
+    const opts = typeof options === 'object' && options !== null ? options : {};
     const room = rooms.get(currentRoomCode);
     if (!room) return;
     if (room.hostId !== currentPlayerId) {
-      if (callback) callback({ ok: false, error: 'Solo el anfitrión puede iniciar la partida.' });
+      if (cb) cb({ ok: false, error: 'Solo el anfitrión puede iniciar la partida.' });
       return;
     }
-    if (room.players.length < 2 || room.players.length > 8) {
-      if (callback) callback({ ok: false, error: 'Se necesitan entre 2 y 8 jugadores para comenzar.' });
+
+    const minPlayers = room.gameType === 'crossword' ? 1 : 2;
+    if (room.players.length < minPlayers || room.players.length > 8) {
+      if (cb) cb({ ok: false, error: `Se necesitan entre ${minPlayers} y 8 jugadores para comenzar.` });
       return;
+    }
+
+    if (opts.category) room.settings.category = opts.category;
+    if (opts.difficulty) room.settings.difficulty = opts.difficulty;
+    if (opts.startingMoney) {
+      room.settings.startingMoney = Number(opts.startingMoney) || 1500000;
+      room.players.forEach((p) => {
+        p.money = room.settings.startingMoney;
+      });
     }
 
     room.status = 'playing';
     room.winner = null;
 
+    if (room.gameType === 'crossword' || room.gameType === 'pictionary') {
+      await gamePartyManager.startOrSyncUnifiedRoom({
+        code: room.code,
+        gameType: room.gameType,
+        category: room.settings.category || 'todo_tipo',
+        difficulty: room.settings.difficulty || 'Fácil'
+      });
+      addLog(
+        room,
+        `🚀 ¡Comenzó ${GAME_LABELS[room.gameType]} en la sala ${room.code}!`,
+        'success'
+      );
+      broadcastRoomState(room);
+      broadcastPublicRooms();
+      if (cb) cb({ ok: true });
+      return;
+    }
+
     if (room.gameType === 'cual_es') {
       startCualEsGame(room);
       broadcastRoomState(room);
       broadcastPublicRooms();
-      if (callback) callback({ ok: true });
+      if (cb) cb({ ok: true });
       return;
     }
 
@@ -991,7 +1123,7 @@ io.on('connection', (socket) => {
     if (firstPlayer.isBot) {
       scheduleBotTurn(room);
     }
-    if (callback) callback({ ok: true });
+    if (cb) cb({ ok: true });
   });
 
   // Clic en un símbolo del juego "¿Cuál es?"

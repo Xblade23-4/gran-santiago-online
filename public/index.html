@@ -47,10 +47,10 @@
             <div id="avatar-selector" class="avatar-grid"></div>
           </div>
 
-          <div class="divider"><span>CREAR NUEVA PARTIDA</span></div>
+          <div class="divider"><span>CREAR NUEVA SALA UNIFICADA</span></div>
 
           <div class="form-group">
-            <label>Selecciona el Juego Multijugador</label>
+            <label>Tu Voto Inicial de Juego (podrán votar todos en la Sala)</label>
             <div class="game-mode-selector">
               <button type="button" id="mode-btn-santiago" class="mode-option selected" data-mode="santiago">
                 <span class="mode-icon">🚇</span>
@@ -66,20 +66,20 @@
                   <small>Agilidad Visual y Cartas</small>
                 </div>
               </button>
-              <a href="/gameparty/" class="mode-option" style="text-decoration:none; color:inherit;">
+              <button type="button" id="mode-btn-crossword" class="mode-option" data-mode="crossword">
                 <span class="mode-icon">🧩</span>
                 <div>
                   <strong>Crucigrama Party</strong>
                   <small>Foto-Crucigramas 15x15</small>
                 </div>
-              </a>
-              <a href="/gameparty/" class="mode-option" style="text-decoration:none; color:inherit;">
+              </button>
+              <button type="button" id="mode-btn-pictionary" class="mode-option" data-mode="pictionary">
                 <span class="mode-icon">🎨</span>
                 <div>
                   <strong>Doodle Party</strong>
                   <small>Dibuja y Adivina en Vivo</small>
                 </div>
-              </a>
+              </button>
             </div>
           </div>
 
@@ -92,15 +92,15 @@
             </select>
           </div>
 
-          <button id="btn-create-room" class="btn btn-primary btn-lg btn-block">
-            🚀 Crear Sala Online (2 - 8 Jugadores)
+          <button type="button" id="btn-create-room" class="btn btn-primary btn-lg btn-block">
+            🚀 Crear Sala Online Unificada (1 - 8 Jugadores)
           </button>
 
           <div class="divider"><span>O ÚNETE CON CÓDIGO</span></div>
 
           <div class="join-code-row">
             <input type="text" id="input-room-code" placeholder="STGO-XXXX" maxlength="10" />
-            <button id="btn-join-code" class="btn btn-secondary">Entrar a Sala</button>
+            <button type="button" id="btn-join-code" class="btn btn-secondary">Entrar a Sala</button>
           </div>
         </section>
 
@@ -108,18 +108,19 @@
         <section class="glass-card public-rooms-card">
           <div class="card-header-flex">
             <h2>🌐 Salas Públicas en Espera</h2>
-            <button id="btn-refresh-rooms" class="btn btn-ghost btn-sm" title="Actualizar lista">🔄 Actualizar</button>
+            <button type="button" id="btn-refresh-rooms" class="btn btn-ghost btn-sm" title="Actualizar lista">🔄 Actualizar</button>
           </div>
           <div id="public-rooms-list" class="public-rooms-list">
             <div class="empty-state">No hay salas abiertas en este instante. ¡Crea una a la izquierda e invita a tus amigos o agrega Bots!</div>
           </div>
 
           <div class="features-box">
-            <h3>✨ 2 Juegos Multijugador Incluidos (2 a 8 Jugadores)</h3>
+            <h3>✨ 4 Juegos en 1 Lobby Unificado con Votación y Chat</h3>
             <ul>
-              <li>🚇 <strong>Gran Santiago Online:</strong> Compra comunas, estaciones de Metro y edifica en Sanhattan con economía en Pesos Chilenos ($ CLP).</li>
-              <li>🔍 <strong>¿Cuál es? (Coincidencias):</strong> Rapidez visual y agilidad mental. Entre tu carta y la carta del centro siempre hay <strong>un único dibujo idéntico</strong>. ¡Haz clic sobre el objeto repetido antes que los demás!</li>
-              <li>❄️ <strong>Juego Justo Anti-Spam:</strong> En <em>¿Cuál es?</em>, si te equivocas y pulsas un objeto que no está en ambas cartas, recibes <strong>3 segundos de penalización</strong> sin poder hacer clic.</li>
+              <li>🗳️ <strong>Lobby Único con Votación y Chat:</strong> Todos entran a la misma sala, chatean en vivo y votan en tiempo real a qué jugar.</li>
+              <li>🚇 <strong>Gran Santiago Online:</strong> Compra comunas, estaciones de Metro y edifica en Sanhattan con Pesos Chilenos ($ CLP).</li>
+              <li>🔍 <strong>¿Cuál es? (Coincidencias):</strong> Rapidez visual con mazo 3D, manos en los bordes y 3s de penalización anti-spam.</li>
+              <li>🧩 <strong>Crucigrama Party & 🎨 Doodle Party:</strong> Resuelvan Foto-Crucigramas 15x15 colaborativos o dibujen y adivinen contra el reloj.</li>
             </ul>
           </div>
         </section>
@@ -127,49 +128,151 @@
     </div>
   </main>
 
-  <!-- ================= PANTALLA DE SALA DE ESPERA (LOBBY) ================= -->
+  <!-- ================= PANTALLA DE SALA DE ESPERA UNIFICADA (LOBBY CON VOTACIÓN Y CHAT) ================= -->
   <section id="screen-lobby" class="screen">
-    <div class="lobby-container glass-card">
+    <div class="lobby-container glass-card unified-lobby-container">
       <div class="lobby-top">
         <div>
-          <span class="badge-online">🟢 SALA ONLINE ACTIVA</span>
+          <span class="badge-online">🟢 LOBBY MULTIJUEGO UNIFICADO</span>
           <h2>Sala de Espera — <span id="lobby-room-code" class="highlight-code">STGO-0000</span></h2>
-          <p class="text-muted">Comparte el código o el enlace directo con tus amigos (mínimo 2, máximo 8 jugadores).</p>
+          <p class="text-muted">Voten por el juego que prefieran, conversen en el chat y compartan el enlace con sus amigos.</p>
         </div>
         <div class="lobby-share-actions">
-          <button id="btn-copy-link" class="btn btn-secondary">🔗 Copiar Enlace de Invitación</button>
-          <button id="btn-leave-lobby" class="btn btn-danger-outline">Salir</button>
+          <button type="button" id="btn-copy-link" class="btn btn-secondary">🔗 Copiar Enlace de Invitación</button>
+          <button type="button" id="btn-leave-lobby" class="btn btn-danger-outline">Salir</button>
         </div>
       </div>
 
-      <!-- Selector de juego en el Lobby -->
-      <div class="lobby-mode-bar">
-        <span>🎮 Juego Seleccionado: <strong id="lobby-current-game-label">🚇 Gran Santiago Online</strong></span>
-        <div id="lobby-host-mode-switch" class="lobby-mode-buttons">
-          <button type="button" id="btn-lobby-mode-santiago" class="btn btn-sm btn-accent">🚇 Gran Santiago</button>
-          <button type="button" id="btn-lobby-mode-cuales" class="btn btn-sm btn-secondary">🔍 ¿Cuál es?</button>
+      <div class="unified-lobby-grid">
+        <!-- COLUMNA PRINCIPAL DEL LOBBY: VOTACIÓN DE LOS 4 JUEGOS + JUGADORES + INICIAR -->
+        <div class="unified-lobby-main">
+          <div class="lobby-voting-section">
+            <div class="lobby-voting-header">
+              <span>🗳️ <strong>Votación de Juego en Vivo</strong> <small class="text-muted">(Haz clic en una tarjeta para votar)</small></span>
+              <span class="winning-game-pill">Ganando: <strong id="lobby-current-game-label">🚇 Gran Santiago Online</strong></span>
+            </div>
+
+            <!-- Botones rápidos ocultos por compatibilidad -->
+            <div id="lobby-host-mode-switch" class="hidden">
+              <button type="button" id="btn-lobby-mode-santiago">🚇 Gran Santiago</button>
+              <button type="button" id="btn-lobby-mode-cuales">🔍 ¿Cuál es?</button>
+            </div>
+
+            <div id="lobby-voting-grid" class="lobby-voting-grid">
+              <button type="button" class="lobby-vote-card selected" data-game="santiago" id="vote-card-santiago">
+                <div class="lvc-top">
+                  <span class="lvc-icon">🚇</span>
+                  <span class="lvc-badge" id="vote-badge-santiago">1 voto</span>
+                </div>
+                <div class="lvc-title">Gran Santiago Online</div>
+                <div class="lvc-desc">Monopoly chileno en $ CLP, comunas y Metro</div>
+                <div class="lvc-voters" id="voters-santiago"></div>
+              </button>
+
+              <button type="button" class="lobby-vote-card" data-game="cual_es" id="vote-card-cual_es">
+                <div class="lvc-top">
+                  <span class="lvc-icon">🔍</span>
+                  <span class="lvc-badge" id="vote-badge-cual_es">0 votos</span>
+                </div>
+                <div class="lvc-title">¿Cuál es?</div>
+                <div class="lvc-desc">Agilidad visual, mazo 3D y manos en mesa</div>
+                <div class="lvc-voters" id="voters-cual_es"></div>
+              </button>
+
+              <button type="button" class="lobby-vote-card" data-game="crossword" id="vote-card-crossword">
+                <div class="lvc-top">
+                  <span class="lvc-icon">🧩</span>
+                  <span class="lvc-badge" id="vote-badge-crossword">0 votos</span>
+                </div>
+                <div class="lvc-title">Crucigrama Party</div>
+                <div class="lvc-desc">Foto-Crucigramas colaborativos 15x15</div>
+                <div class="lvc-voters" id="voters-crossword"></div>
+              </button>
+
+              <button type="button" class="lobby-vote-card" data-game="pictionary" id="vote-card-pictionary">
+                <div class="lvc-top">
+                  <span class="lvc-icon">🎨</span>
+                  <span class="lvc-badge" id="vote-badge-pictionary">0 votos</span>
+                </div>
+                <div class="lvc-title">Doodle Party</div>
+                <div class="lvc-desc">Dibuja y adivina palabras en tiempo real</div>
+                <div class="lvc-voters" id="voters-pictionary"></div>
+              </button>
+            </div>
+
+            <!-- Ajustes específicos del juego ganador (visibles para el anfitrión) -->
+            <div id="lobby-game-settings-bar" class="lobby-game-settings-bar">
+              <div id="lobby-money-setting-wrap" class="lobby-setting-item">
+                <label for="lobby-select-money">💰 Capital Inicial ($ CLP):</label>
+                <select id="lobby-select-money">
+                  <option value="1500000">$1.500.000 CLP (Estándar)</option>
+                  <option value="2000000">$2.000.000 CLP (Abundante)</option>
+                  <option value="1000000">$1.000.000 CLP (Rápido)</option>
+                </select>
+              </div>
+              <div id="lobby-party-setting-wrap" class="lobby-setting-item hidden">
+                <label for="lobby-select-category">📚 Categoría:</label>
+                <select id="lobby-select-category">
+                  <option value="todo_tipo">🎲 Todo Tipo (Mix General)</option>
+                  <option value="cultura_chilena">🇨🇱 Cultura Chilena y Modismos</option>
+                  <option value="animales_naturaleza">🐾 Animales y Naturaleza</option>
+                  <option value="cine_series_anime">🎬 Cine, Series y Anime</option>
+                  <option value="videojuegos_tech">🎮 Videojuegos y Tecnología</option>
+                  <option value="comida_bebida">🍕 Comida y Gastronomía</option>
+                  <option value="deportes_mundial">⚽ Deportes</option>
+                  <option value="objetos_cotidianos">💡 Objetos Cotidianos</option>
+                </select>
+                <label for="lobby-select-difficulty">⚡ Dificultad:</label>
+                <select id="lobby-select-difficulty">
+                  <option value="Fácil">🟢 Fácil</option>
+                  <option value="Medio">🟡 Medio</option>
+                  <option value="Difícil">🔴 Difícil</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="lobby-players-header">
+            <h3>👥 Jugadores en la Sala (<span id="lobby-player-count">1</span>/8)</h3>
+            <button type="button" id="btn-add-bot" class="btn btn-accent btn-sm">🤖 + Agregar Bot Chileno</button>
+          </div>
+
+          <div id="lobby-players-grid" class="lobby-players-grid"></div>
+
+          <div class="lobby-footer">
+            <p id="lobby-status-hint" class="lobby-hint">Esperando jugadores o votación para comenzar...</p>
+            <button type="button" id="btn-start-game" class="btn btn-primary btn-lg" disabled>
+              🚀 ¡Iniciar Partida!
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div class="lobby-players-header">
-        <h3>Jugadores Conectados (<span id="lobby-player-count">1</span>/8)</h3>
-        <button id="btn-add-bot" class="btn btn-accent btn-sm">🤖 + Agregar Bot Chileno</button>
-      </div>
-
-      <div id="lobby-players-grid" class="lobby-players-grid"></div>
-
-      <div class="lobby-footer">
-        <p id="lobby-status-hint" class="lobby-hint">Esperando al menos 2 jugadores para abrir las boleterías del Metro...</p>
-        <button id="btn-start-game" class="btn btn-primary btn-lg" disabled>
-          🚀 ¡Iniciar Partida en Gran Santiago!
-        </button>
+        <!-- COLUMNA DERECHA DEL LOBBY: CHAT EN VIVO DE LA SALA -->
+        <aside class="unified-lobby-chat">
+          <div class="lobby-chat-header">
+            <h3>💬 Chat de la Sala</h3>
+            <span class="badge-online">En vivo</span>
+          </div>
+          <div id="lobby-chat-messages" class="lobby-chat-messages">
+            <div class="empty-small">¡Saluda a la sala y pónganse de acuerdo por cuál juego votar!</div>
+          </div>
+          <form id="lobby-chat-form" class="chat-form lobby-chat-form">
+            <input type="text" id="lobby-chat-input" placeholder="Escribe en el chat del lobby..." maxlength="160" autocomplete="off" />
+            <button type="submit" class="btn btn-primary btn-sm">Enviar</button>
+          </form>
+        </aside>
       </div>
     </div>
   </section>
 
   <!-- ================= PANTALLA DE JUEGO PRINCIPAL ================= -->
   <section id="screen-game" class="screen">
-    <div class="game-layout">
+    <!-- Arena embebida de Crucigrama Party / Doodle Party cuando ganan la votación -->
+    <div id="gameparty-arena" class="gameparty-arena hidden">
+      <iframe id="gameparty-frame" title="Crucigrama Party y Doodle Party"></iframe>
+    </div>
+
+    <div id="main-game-layout" class="game-layout">
       <!-- COLUMNA IZQUIERDA: Jugadores, Billeteras CLP y Propiedades -->
       <aside class="sidebar sidebar-left">
         <div class="sidebar-header">
@@ -196,6 +299,9 @@
           <div id="my-properties-list" class="my-properties-list">
             <p class="empty-small">Aún no tienes propiedades. ¡Lanza los dados y compra comunas!</p>
           </div>
+          <button id="btn-return-lobby-santiago" class="btn btn-secondary btn-xs hidden" style="margin-top:8px;">
+            🔄 Volver al Lobby (Votar otro juego)
+          </button>
         </div>
 
         <div class="panel-box my-portfolio-box hidden" id="cuales-rules-panel">

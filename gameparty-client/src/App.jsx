@@ -62,6 +62,22 @@ export default function App() {
     newSocket.on("connect", () => {
       console.log("Conectado al servidor WebSocket con ID:", newSocket.id);
       setMyPlayerId(newSocket.id);
+
+      const autojoin = params.get("autojoin");
+      if (autojoin === "1" && roomParam) {
+        const nick = params.get("nick") || "Jugador";
+        const av = params.get("avatar") || "🦊";
+        const isHostParam = params.get("isHost") === "1";
+        newSocket.emit(
+          "join-room",
+          { roomCode: roomParam.toUpperCase(), nickname: nick, avatar: av, isHost: isHostParam },
+          (res) => {
+            if (res?.success && res.room) {
+              setRoom(res.room);
+            }
+          }
+        );
+      }
     });
 
     // Sincronización completa de sala
@@ -335,12 +351,20 @@ export default function App() {
   };
 
   const handleReturnToLobby = () => {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "UNIFIED_RETURN_TO_LOBBY" }, "*");
+      return;
+    }
     if (!socket) return;
     setShowVictory(false);
     socket.emit("return-to-lobby");
   };
 
   const handleLeaveRoom = () => {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "UNIFIED_LEAVE_ROOM" }, "*");
+      return;
+    }
     setRoom(null);
     setPictionaryState(null);
     setShowVictory(false);

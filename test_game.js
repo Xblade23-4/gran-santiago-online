@@ -150,18 +150,50 @@ async function runTests() {
     assert.strictEqual(wrongClick.penalized, true, 'Clic erróneo debe activar penalización de 3 segundos');
     console.log('✅ Penalización de 3 segundos anti-spam verificada en "¿Cuál es?".');
 
-    // 8. Probar integración de GameParty Web (Crucigrama Party & Doodle Party) en el mismo servidor
-    const gpHost = createClient();
-    await new Promise((r) => gpHost.on('connect', r));
-    const gpCreateRes = await new Promise((r) =>
-      gpHost.emit('create-room', { nickname: 'AlvaroGP', avatar: '🦊' }, r)
+    // 8. Probar Lobby Unificado con Votación de los 4 Juegos + Chat en el Lobby + Inicio de Doodle Party / Crucigrama
+    const uHost = createClient();
+    await new Promise((r) => uHost.on('connect', r));
+    const uCreate = await new Promise((r) =>
+      uHost.emit(
+        'create_room',
+        { playerName: 'HostUnificado', avatarId: 'condorito', gameType: 'santiago', playerId: 'uh1' },
+        r
+      )
     );
-    assert.strictEqual(gpCreateRes.success, true, 'Sala de GameParty (Crucigrama/Doodle) debe crearse');
-    const gpStartRes = await new Promise((r) =>
-      gpHost.emit('start-game', { gameType: 'crossword', category: 'general', difficulty: 'Fácil' }, r)
+    assert.strictEqual(uCreate.ok, true, 'Sala unificada debe crearse correctamente');
+    const uCode = uCreate.roomCode;
+
+    const uGuest1 = createClient();
+    await new Promise((r) => uGuest1.on('connect', r));
+    await new Promise((r) =>
+      uGuest1.emit('join_room', { roomCode: uCode, playerName: 'Votante1', playerId: 'ug1' }, r)
     );
-    assert.strictEqual(gpStartRes.success, true, 'Partida de Crucigrama Party debe iniciar en el servidor unificado');
-    console.log('✅ Integración de GameParty Web (Crucigrama Party & Doodle Party) verificada.');
+
+    const uGuest2 = createClient();
+    await new Promise((r) => uGuest2.on('connect', r));
+    await new Promise((r) =>
+      uGuest2.emit('join_room', { roomCode: uCode, playerName: 'Votante2', playerId: 'ug2' }, r)
+    );
+
+    // Enviar mensaje al Chat del Lobby
+    uGuest1.emit('send_chat', { message: '¡Votemos por Doodle Party!' });
+    await new Promise((r) => setTimeout(r, 80));
+    const unifiedRoom = rooms.get(uCode);
+    assert.strictEqual(unifiedRoom.chat.length, 1, 'El chat del lobby debe registrar el mensaje en vivo');
+
+    // Votar 2 jugadores por pictionary (Doodle Party) contra 1 en santiago
+    await new Promise((r) => uGuest1.emit('vote_game', { gameType: 'pictionary' }, r));
+    const voteRes2 = await new Promise((r) => uGuest2.emit('vote_game', { gameType: 'pictionary' }, r));
+    assert.strictEqual(voteRes2.ok, true, 'El voto en el lobby debe procesarse');
+    assert.strictEqual(unifiedRoom.gameType, 'pictionary', 'La mayoría de votos (2 vs 1) debe elegir Doodle Party');
+
+    // Iniciar la partida votada desde el Lobby Unificado
+    const startUnifiedRes = await new Promise((r) =>
+      uHost.emit('start_game', { category: 'todo_tipo', difficulty: 'Fácil' }, r)
+    );
+    assert.strictEqual(startUnifiedRes.ok, true, 'El anfitrión debe poder iniciar el juego ganador de la votación');
+    assert.strictEqual(unifiedRoom.status, 'playing', 'La sala unificada pasa a estado playing');
+    console.log('✅ Lobby Unificado con Votación en vivo (4 juegos) y Chat de Sala verificado.');
 
     console.log('\n🎉 ¡TODAS LAS PRUEBAS AUTOMATIZADAS PASARON EXITOSAMENTE!');
   } finally {

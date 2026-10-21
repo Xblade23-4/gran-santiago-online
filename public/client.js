@@ -385,30 +385,47 @@ function setupDialogLightDismiss(dialog) {
   }
 }
 
+let activeGamePartyUrl = null;
+
+const GAME_META_LABELS = {
+  santiago: { title: '🚇 Gran Santiago Online', short: 'Gran Santiago', icon: '🚇' },
+  cual_es: { title: '🔍 ¿Cuál es? (Coincidencias)', short: '¿Cuál es?', icon: '🔍' },
+  crossword: { title: '🧩 Crucigrama Party', short: 'Crucigrama Party', icon: '🧩' },
+  pictionary: { title: '🎨 Doodle Party', short: 'Doodle Party', icon: '🎨' }
+};
+
 // Inicialización al cargar la página
 async function initApp() {
   setupDialogLightDismiss(document.getElementById('property-dialog'));
   setupDialogLightDismiss(document.getElementById('trade-dialog'));
   setupDialogLightDismiss(document.getElementById('drawn-card-dialog'));
 
-  const res = await fetch('/api/board');
-  boardMeta = await res.json();
-
-  renderAvatarSelector();
-  buildBoardDOM();
+  // Vincular eventos inmediatamente para que Crear Sala y Entrar funcionen sin demora
   bindUIEvents();
 
-  // Autocompletar nombre guardado o código por URL (?sala=STGO-XXXX)
+  // Autocompletar nombre guardado o código por URL (?sala=STGO-XXXX o ?room=STGO-XXXX)
   const savedName = localStorage.getItem('gso_playerName');
   if (savedName) {
     document.getElementById('input-player-name').value = savedName;
   }
 
   const params = new URLSearchParams(window.location.search);
-  const roomParam = params.get('sala');
+  const roomParam = params.get('sala') || params.get('room');
   if (roomParam) {
     document.getElementById('input-room-code').value = roomParam.toUpperCase();
     showToast(`Código de invitación detectado: ${roomParam.toUpperCase()}`);
+  }
+
+  try {
+    const res = await fetch('/api/board');
+    boardMeta = await res.json();
+    renderAvatarSelector();
+    buildBoardDOM();
+    if (currentRoomState && currentRoomState.status !== 'lobby') {
+      renderGame(currentRoomState);
+    }
+  } catch (err) {
+    console.error('Error cargando datos del tablero:', err);
   }
 }
 
@@ -488,35 +505,74 @@ function switchScreen(screenId) {
 }
 
 function bindUIEvents() {
-  // Selector de Modo de Juego en pantalla de inicio
-  const btnModeSantiago = document.getElementById('mode-btn-santiago');
-  const btnModeCuales = document.getElementById('mode-btn-cuales');
+  // Selector de Modo de Juego en pantalla de inicio (voto inicial al crear sala)
+  const modeOptions = document.querySelectorAll('.game-mode-selector .mode-option[data-mode]');
   const moneyGroup = document.getElementById('group-starting-money');
 
-  if (btnModeSantiago && btnModeCuales) {
-    btnModeSantiago.addEventListener('click', () => {
-      selectedGameType = 'santiago';
-      btnModeSantiago.classList.add('selected');
-      btnModeCuales.classList.remove('selected');
-      if (moneyGroup) moneyGroup.style.display = 'block';
+  modeOptions.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      selectedGameType = btn.dataset.mode || 'santiago';
+      modeOptions.forEach((el) => el.classList.remove('selected'));
+      btn.classList.add('selected');
+      if (moneyGroup) {
+        moneyGroup.style.display = selectedGameType === 'santiago' ? 'block' : 'none';
+      }
     });
-    btnModeCuales.addEventListener('click', () => {
-      selectedGameType = 'cual_es';
-      btnModeCuales.classList.add('selected');
-      btnModeSantiago.classList.remove('selected');
-      if (moneyGroup) moneyGroup.style.display = 'none';
-    });
-  }
+  });
 
-  // Selector de Modo en el Lobby
+  // Votación de juego en el Lobby Unificado (4 tarjetas votables por todos)
+  document.querySelectorAll('.lobby-vote-card[data-game]').forEach((card) => {
+    card.addEventListener('click', () => {
+      const gameType = card.dataset.game;
+      playTone(520, 0.08, 'sine');
+      socket.emit('vote_game', { gameType });
+    });
+  });
+
+  // Botones de compatibilidad en el Lobby
   document.getElementById('btn-lobby-mode-santiago')?.addEventListener('click', () => {
     socket.emit('set_game_type', { gameType: 'santiago' });
   });
   document.getElementById('btn-lobby-mode-cuales')?.addEventListener('click', () => {
     socket.emit('set_game_type', { gameType: 'cual_es' });
   });
+
+  // Ajustes de sala en el Lobby (Capital CLP, Categoría, Dificultad)
+  document.getElementById('lobby-select-money')?.addEventListener('change', (e) => {
+    socket.emit('update_lobby_settings', { startingMoney: Number(e.target.value) || 1500000 });
+  });
+  document.getElementById('lobby-select-category')?.addEventListener('change', (e) => {
+    socket.emit('update_lobby_settings', { category: e.target.value });
+  });
+  document.getElementById('lobby-select-difficulty')?.addEventListener('change', (e) => {
+    socket.emit('update_lobby_settings', { difficulty: e.target.value });
+  });
+
+  // Chat en vivo dentro del Lobby Unificado
+  document.getElementById('lobby-chat-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('lobby-chat-input');
+    const msg = input?.value.trim();
+    if (!msg) return;
+    socket.emit('send_chat', { message: msg });
+    input.value = '';
+  });
+
+  // Volver al Lobby Unificado desde cualquier juego
   document.getElementById('btn-return-lobby')?.addEventListener('click', () => {
     socket.emit('return_to_lobby');
+  });
+  document.getElementById('btn-return-lobby-santiago')?.addEventListener('click', () => {
+    socket.emit('return_to_lobby');
+  });
+
+  // Escuchar mensajes desde el iframe de Crucigrama Party / Doodle Party
+  window.addEventListener('message', (e) => {
+    if (e.data?.type === 'UNIFIED_RETURN_TO_LOBBY') {
+      socket.emit('return_to_lobby');
+    } else if (e.data?.type === 'UNIFIED_LEAVE_ROOM') {
+      window.location.href = '/';
+    }
   });
 
   // Crear sala
@@ -530,6 +586,9 @@ function bindUIEvents() {
       { playerName, avatarId: selectedAvatarId, startingMoney, gameType: selectedGameType, playerId: myPlayerId },
       (res) => {
         if (res && res.ok) {
+          if (res.state) {
+            applyIncomingRoomState(res.state);
+          }
           window.history.replaceState({}, '', `?sala=${res.roomCode}`);
         } else {
           showToast(res?.error || 'Error al crear sala');
@@ -577,7 +636,10 @@ function bindUIEvents() {
 
   // Iniciar partida
   document.getElementById('btn-start-game').addEventListener('click', () => {
-    socket.emit('start_game', {}, (res) => {
+    const category = document.getElementById('lobby-select-category')?.value || 'todo_tipo';
+    const difficulty = document.getElementById('lobby-select-difficulty')?.value || 'Fácil';
+    const startingMoney = Number(document.getElementById('lobby-select-money')?.value) || 1500000;
+    socket.emit('start_game', { category, difficulty, startingMoney }, (res) => {
       if (res && !res.ok) showToast(res.error);
     });
   });
@@ -739,6 +801,9 @@ function joinRoomByCode(roomCode) {
     { roomCode, playerName, avatarId: selectedAvatarId, playerId: myPlayerId },
     (res) => {
       if (res && res.ok) {
+        if (res.state) {
+          applyIncomingRoomState(res.state);
+        }
         window.history.replaceState({}, '', `?sala=${res.roomCode}`);
       } else {
         showToast(res?.error || 'No se pudo entrar a la sala');
@@ -757,17 +822,17 @@ socket.on('public_rooms', (roomsList) => {
 
   container.innerHTML = '';
   roomsList.forEach((r) => {
-    const isCualEs = r.gameType === 'cual_es';
-    const gameBadge = isCualEs ? '🔍 ¿Cuál es?' : '🚇 Gran Santiago';
-    const subInfo = isCualEs
-      ? `👥 ${r.playerCount}/${r.maxPlayers} jugadores • Agilidad Visual`
-      : `👥 ${r.playerCount}/${r.maxPlayers} jugadores • Capital: ${formatCLP(r.startingMoney)}`;
+    const gMeta = GAME_META_LABELS[r.gameType] || GAME_META_LABELS.santiago;
+    const subInfo =
+      r.gameType === 'santiago'
+        ? `👥 ${r.playerCount}/${r.maxPlayers} jugadores • Capital: ${formatCLP(r.startingMoney)} • Votación abierta`
+        : `👥 ${r.playerCount}/${r.maxPlayers} jugadores • Votación abierta en el Lobby`;
 
     const item = document.createElement('div');
     item.className = 'room-item';
     item.innerHTML = `
       <div class="room-item-info">
-        <strong>${r.code}</strong> • <span style="color:#facc15">${gameBadge}</span> — Mesa de ${r.hostName}
+        <strong>${r.code}</strong> • <span style="color:#facc15">${gMeta.icon} ${gMeta.short}</span> — Sala de ${r.hostName}
         <small>${subInfo}</small>
       </div>
       <button class="btn btn-accent btn-sm">Unirse</button>
@@ -791,7 +856,7 @@ function applyIncomingRoomState(state) {
     renderGame(state);
 
     if (
-      state.gameType !== 'cual_es' &&
+      state.gameType === 'santiago' &&
       state.status === 'playing' &&
       activePlayer &&
       activePlayer.id !== prevTurnId
@@ -1118,42 +1183,112 @@ function renderLobby(state) {
   document.getElementById('lobby-room-code').textContent = state.code;
   document.getElementById('lobby-player-count').textContent = state.players.length;
 
+  // Limpiar el iframe de GameParty si se regresó al Lobby
+  const gpFrame = document.getElementById('gameparty-frame');
+  if (gpFrame && activeGamePartyUrl) {
+    gpFrame.src = 'about:blank';
+    activeGamePartyUrl = null;
+  }
+
   const isHost = state.hostId === myPlayerId;
-  const isCualEs = state.gameType === 'cual_es';
+  const activeGame = state.gameType || 'santiago';
+  const votes = state.votes || {};
+  const myVote = votes[myPlayerId] || activeGame;
+  const gMeta = GAME_META_LABELS[activeGame] || GAME_META_LABELS.santiago;
 
   const gameLabel = document.getElementById('lobby-current-game-label');
   if (gameLabel) {
-    gameLabel.textContent = isCualEs
-      ? '🔍 ¿Cuál es? (Rapidez Visual y Coincidencias)'
-      : '🚇 Gran Santiago Online (Propiedades en $ CLP)';
+    gameLabel.textContent = gMeta.title;
   }
 
-  const hostSwitch = document.getElementById('lobby-host-mode-switch');
-  if (hostSwitch) {
-    hostSwitch.style.display = isHost ? 'flex' : 'none';
-    document.getElementById('btn-lobby-mode-santiago').className =
-      'btn btn-sm ' + (!isCualEs ? 'btn-accent' : 'btn-secondary');
-    document.getElementById('btn-lobby-mode-cuales').className =
-      'btn btn-sm ' + (isCualEs ? 'btn-accent' : 'btn-secondary');
+  // Contabilizar votos y mostrar avatares de votantes en cada una de las 4 tarjetas
+  const allGameKeys = ['santiago', 'cual_es', 'crossword', 'pictionary'];
+  allGameKeys.forEach((gKey) => {
+    const cardEl = document.getElementById(`vote-card-${gKey}`);
+    const badgeEl = document.getElementById(`vote-badge-${gKey}`);
+    const votersEl = document.getElementById(`voters-${gKey}`);
+
+    const votersForGame = state.players.filter((p) => (votes[p.id] || state.gameType) === gKey);
+    const count = votersForGame.length;
+    const isLeading = activeGame === gKey;
+    const isMyChoice = myVote === gKey;
+
+    if (cardEl) {
+      cardEl.classList.toggle('leading-vote', isLeading);
+      cardEl.classList.toggle('my-vote', isMyChoice);
+      cardEl.classList.toggle('selected', isLeading);
+    }
+
+    if (badgeEl) {
+      const voteWord = count === 1 ? '1 voto' : `${count} votos`;
+      badgeEl.textContent = isLeading ? `🏆 Ganando • ${voteWord}` : voteWord;
+    }
+
+    if (votersEl) {
+      votersEl.innerHTML = '';
+      votersForGame.forEach((vp) => {
+        const chip = document.createElement('span');
+        chip.className = 'voter-chip';
+        chip.textContent = `${vp.avatar?.icon || '👤'} ${vp.name}`;
+        votersEl.appendChild(chip);
+      });
+    }
+  });
+
+  // Mostrar ajustes contextuales según el juego más votado
+  const moneyWrap = document.getElementById('lobby-money-setting-wrap');
+  const partyWrap = document.getElementById('lobby-party-setting-wrap');
+  const settingsBar = document.getElementById('lobby-game-settings-bar');
+
+  if (activeGame === 'santiago') {
+    moneyWrap?.classList.remove('hidden');
+    partyWrap?.classList.add('hidden');
+    settingsBar?.classList.remove('hidden');
+    const moneySel = document.getElementById('lobby-select-money');
+    if (moneySel) {
+      moneySel.value = String(state.settings?.startingMoney || 1500000);
+      moneySel.disabled = !isHost;
+    }
+  } else if (activeGame === 'crossword' || activeGame === 'pictionary') {
+    moneyWrap?.classList.add('hidden');
+    partyWrap?.classList.remove('hidden');
+    settingsBar?.classList.remove('hidden');
+    const catSel = document.getElementById('lobby-select-category');
+    const diffSel = document.getElementById('lobby-select-difficulty');
+    if (catSel) {
+      catSel.value = state.settings?.category || 'todo_tipo';
+      catSel.disabled = !isHost;
+    }
+    if (diffSel) {
+      diffSel.value = state.settings?.difficulty || 'Fácil';
+      diffSel.disabled = !isHost;
+    }
+  } else {
+    settingsBar?.classList.add('hidden');
   }
 
-  document.getElementById('btn-add-bot').style.display = isHost && state.players.length < 8 ? 'inline-flex' : 'none';
+  document.getElementById('btn-add-bot').style.display =
+    isHost && state.players.length < 8 && (activeGame === 'santiago' || activeGame === 'cual_es')
+      ? 'inline-flex'
+      : 'none';
 
+  const minPlayers = activeGame === 'crossword' ? 1 : 2;
   const startBtn = document.getElementById('btn-start-game');
-  startBtn.disabled = !isHost || state.players.length < 2;
-  startBtn.textContent = isCualEs
-    ? '🚀 ¡Iniciar Partida de ¿Cuál es?!'
-    : '🚀 ¡Iniciar Partida en Gran Santiago!';
+  startBtn.disabled = !isHost || state.players.length < minPlayers;
+  startBtn.textContent = `🚀 ¡Iniciar ${gMeta.short}!`;
+
   document.getElementById('lobby-status-hint').textContent = isHost
-    ? (state.players.length >= 2
-      ? `¡Listos para partir con ${state.players.length} jugadores!`
-      : 'Agrega un Bot o invita a un amigo para tener mínimo 2 jugadores.')
-    : 'Esperando que el anfitrión inicie la partida...';
+    ? (state.players.length >= minPlayers
+      ? `¡Listos para comenzar ${gMeta.short} con ${state.players.length} jugador(es)!`
+      : `Se necesitan al menos ${minPlayers} jugadores para iniciar ${gMeta.short} (invita amigos o agrega un Bot).`)
+    : `Vota arriba por tu juego favorito • Esperando que el anfitrión inicie ${gMeta.short}...`;
 
   const grid = document.getElementById('lobby-players-grid');
   grid.innerHTML = '';
 
   state.players.forEach((p) => {
+    const pVote = votes[p.id] || activeGame;
+    const pVoteMeta = GAME_META_LABELS[pVote] || GAME_META_LABELS.santiago;
     const card = document.createElement('div');
     card.className = 'lobby-player-card';
     card.style.borderColor = p.avatar.color;
@@ -1161,7 +1296,7 @@ function renderLobby(state) {
       <span class="lp-icon">${p.avatar.icon}</span>
       <div>
         <div class="lp-name">${p.name} ${p.id === myPlayerId ? '(Tú)' : ''}</div>
-        <div class="lp-role">${p.id === state.hostId ? '👑 Anfitrión' : (p.isBot ? '🤖 Bot Automático' : '🟢 Conectado')}</div>
+        <div class="lp-role">${p.id === state.hostId ? '👑 Anfitrión' : (p.isBot ? '🤖 Bot Automático' : '🟢 Conectado')} • Vota: ${pVoteMeta.icon}</div>
       </div>
     `;
 
@@ -1178,11 +1313,51 @@ function renderLobby(state) {
 
     grid.appendChild(card);
   });
+
+  // Renderizar Chat en Vivo dentro del Lobby Unificado
+  const lobbyChatEl = document.getElementById('lobby-chat-messages');
+  if (lobbyChatEl) {
+    if (!state.chat || !state.chat.length) {
+      lobbyChatEl.innerHTML = `<div class="empty-small">¡Saluda a la sala y pónganse de acuerdo por cuál juego votar!</div>`;
+    } else {
+      lobbyChatEl.innerHTML = '';
+      state.chat.forEach((c) => {
+        const div = document.createElement('div');
+        div.className = 'chat-msg';
+        div.innerHTML = `<strong>${c.avatar?.icon || ''} ${c.playerName}:</strong> ${c.text}`;
+        lobbyChatEl.appendChild(div);
+      });
+      lobbyChatEl.scrollTop = lobbyChatEl.scrollHeight;
+    }
+  }
 }
 
 function renderGame(state) {
   document.getElementById('game-room-code').textContent = state.code;
   const isCualEs = state.gameType === 'cual_es';
+  const isGameParty = state.gameType === 'crossword' || state.gameType === 'pictionary';
+  const isHost = state.hostId === myPlayerId;
+
+  const gamePartyArenaEl = document.getElementById('gameparty-arena');
+  const mainGameLayoutEl = document.getElementById('main-game-layout');
+
+  if (isGameParty) {
+    if (gamePartyArenaEl) gamePartyArenaEl.classList.remove('hidden');
+    if (mainGameLayoutEl) mainGameLayoutEl.classList.add('hidden');
+    stopBackgroundMusic();
+
+    const me = state.players.find((p) => p.id === myPlayerId) || state.players[0];
+    const targetUrl = `/gameparty/?autojoin=1&room=${encodeURIComponent(state.code)}&nick=${encodeURIComponent(me?.name || 'Jugador')}&avatar=${encodeURIComponent(me?.avatar?.icon || '😎')}&isHost=${isHost ? '1' : '0'}`;
+    const gpFrame = document.getElementById('gameparty-frame');
+    if (gpFrame && activeGamePartyUrl !== targetUrl) {
+      activeGamePartyUrl = targetUrl;
+      gpFrame.src = targetUrl;
+    }
+    return;
+  }
+
+  if (gamePartyArenaEl) gamePartyArenaEl.classList.add('hidden');
+  if (mainGameLayoutEl) mainGameLayoutEl.classList.remove('hidden');
 
   const boardGridEl = document.getElementById('board-grid');
   const cualesArenaEl = document.getElementById('cuales-arena');
@@ -1190,6 +1365,7 @@ function renderGame(state) {
   const cualesRulesEl = document.getElementById('cuales-rules-panel');
   const sidebarTitleEl = document.getElementById('sidebar-players-title');
   const returnLobbyBtn = document.getElementById('btn-return-lobby');
+  const returnLobbySantiagoBtn = document.getElementById('btn-return-lobby-santiago');
   const logPanelBox = document.getElementById('log-panel-box');
 
   boardGridEl.classList.toggle('hidden', isCualEs);
@@ -1199,7 +1375,10 @@ function renderGame(state) {
   if (logPanelBox) logPanelBox.classList.toggle('hidden', isCualEs);
 
   if (returnLobbyBtn) {
-    returnLobbyBtn.classList.toggle('hidden', state.hostId !== myPlayerId);
+    returnLobbyBtn.classList.toggle('hidden', !isHost);
+  }
+  if (returnLobbySantiagoBtn) {
+    returnLobbySantiagoBtn.classList.toggle('hidden', !isHost);
   }
 
   if (sidebarTitleEl) {

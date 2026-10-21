@@ -205,8 +205,60 @@ class GameManager {
     return this.pictionaryRooms.get(code);
   }
 
-  joinRoom({ roomCode, socketId, nickname, avatar }) {
-    const code = roomCode.toUpperCase().trim();
+  async startOrSyncUnifiedRoom({ code, gameType = "crossword", category = "todo_tipo", difficulty = "Fácil" }) {
+    const cleanCode = code.toUpperCase().trim();
+    const existingPictionary = this.pictionaryRooms.get(cleanCode);
+    if (existingPictionary) {
+      existingPictionary.clearTimer();
+      this.pictionaryRooms.delete(cleanCode);
+    }
+
+    const room = {
+      code: cleanCode,
+      gameType,
+      hostId: null,
+      status: "playing",
+      selectedGame: gameType,
+      votes: {},
+      settings: { category, difficulty, rounds: 3 },
+      puzzle: null,
+      boardState: null,
+      solvedClues: { across: [], down: [] },
+      players: [],
+      startTime: Date.now(),
+      endTime: null,
+      chatMessages: [
+        {
+          id: `msg-${Date.now()}`,
+          sender: "Sistema",
+          text: `🚀 ¡Partida iniciada! Juego: ${gameType === "pictionary" ? "Doodle Party 🎨" : "Crucigrama Party 🧩"}`,
+          timestamp: Date.now(),
+          isSystem: true
+        }
+      ]
+    };
+
+    if (gameType === "crossword") {
+      const puzzle = await createPuzzle({ category, difficulty });
+      room.puzzle = puzzle;
+      room.boardState = Array.from({ length: puzzle.rows }, (_, r) =>
+        Array.from({ length: puzzle.cols }, (_, c) => {
+          const gridCell = puzzle.grid[r][c];
+          if (!gridCell || gridCell.type === "clue") return null;
+          return { letter: "", locked: false, lastEditedBy: null };
+        })
+      );
+    } else if (gameType === "pictionary" && this.io) {
+      const pictionary = new PictionaryRoom(room, this.io);
+      this.pictionaryRooms.set(cleanCode, pictionary);
+    }
+
+    this.rooms.set(cleanCode, room);
+    return room;
+  }
+
+  joinRoom({ roomCode, socketId, nickname, avatar, isHost }) {
+    const code = (roomCode || "").toUpperCase().trim();
     const room = this.rooms.get(code);
 
     if (!room) {
@@ -222,6 +274,12 @@ class GameManager {
     const colorIndex = room.players.length % PLAYER_COLORS.length;
     const playerColor = PLAYER_COLORS[colorIndex];
     const playerAvatar = avatar || AVATARS[room.players.length % AVATARS.length];
+    const makeHost = Boolean(isHost) || room.players.length === 0 || !room.hostId;
+
+    if (makeHost) {
+      room.hostId = socketId;
+      room.players.forEach((p) => { p.isHost = false; });
+    }
 
     const newPlayer = {
       id: socketId,
@@ -230,7 +288,7 @@ class GameManager {
       color: playerColor,
       score: 0,
       wordsFound: 0,
-      isHost: room.players.length === 0,
+      isHost: makeHost,
       cursor: { row: 0, col: 0, direction: "across" }
     };
 
@@ -238,6 +296,22 @@ class GameManager {
     room.votes = room.votes || {};
     if (!room.votes[socketId]) {
       room.votes[socketId] = "crossword";
+    }
+
+    // Si es Pictionary y estaba esperando que entraran los jugadores del lobby unificado, iniciar turno
+    if (room.gameType === "pictionary" && room.status === "playing") {
+      let pictionary = this.pictionaryRooms.get(code);
+      if (!pictionary && this.io) {
+        pictionary = new PictionaryRoom(room, this.io);
+        this.pictionaryRooms.set(code, pictionary);
+      }
+      if (pictionary && pictionary.status === "waiting" && room.players.length >= 1) {
+        setTimeout(() => {
+          if (pictionary.status === "waiting" && room.players.length >= 1) {
+            pictionary.restartGame();
+          }
+        }, 600);
+      }
     }
 
     room.chatMessages.push({
