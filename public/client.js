@@ -757,7 +757,13 @@ function buildBoardDOM() {
     const pos = getGridPosition(tile.id);
     const tileEl = document.createElement('div');
     const isCorner = [0, 10, 20, 30].includes(tile.id);
-    tileEl.className = 'board-tile' + (isCorner ? ' corner-tile' : '');
+
+    let edgeClass = 'tile-edge-bottom';
+    if (tile.id >= 11 && tile.id <= 20) edgeClass = 'tile-edge-left';
+    else if (tile.id >= 21 && tile.id <= 30) edgeClass = 'tile-edge-top';
+    else if (tile.id >= 31 && tile.id <= 39) edgeClass = 'tile-edge-right';
+
+    tileEl.className = 'board-tile ' + edgeClass + (isCorner ? ' corner-tile' : '');
     tileEl.id = `board-tile-${tile.id}`;
     tileEl.style.gridRow = pos.row;
     tileEl.style.gridColumn = pos.col;
@@ -1216,6 +1222,10 @@ function applyIncomingRoomState(state) {
   const prevTurnId = lastKnownTurnPlayerId;
   const activePlayer = state.players[state.turnIndex];
   currentRoomState = state;
+
+  if (window.SantiagoMapAnimation) {
+    window.SantiagoMapAnimation.updateGameState(state, myPlayerId);
+  }
 
   if (state.status === 'lobby') {
     lastKnownTurnPlayerId = null;
@@ -1961,7 +1971,31 @@ function renderGame(state) {
         }
       }
     }
+
+    // Resaltar casillas en el tablero según propiedad y dueño
+    const tileEl = document.getElementById(`board-tile-${tile.id}`);
+    if (tileEl) {
+      if (prop && prop.ownerId) {
+        const isMine = prop.ownerId === myPlayerId;
+        tileEl.classList.toggle('tile-owned-by-me', isMine);
+        tileEl.classList.toggle('tile-owned-by-other', !isMine);
+        if (!isMine) {
+          const owner = state.players.find((pl) => pl.id === prop.ownerId);
+          tileEl.style.setProperty('--owner-color', owner?.avatar?.color || '#ef4444');
+        } else {
+          tileEl.style.removeProperty('--owner-color');
+        }
+      } else {
+        tileEl.classList.remove('tile-owned-by-me', 'tile-owned-by-other');
+        tileEl.style.removeProperty('--owner-color');
+      }
+    }
   });
+
+  // Notificar al mapa animado de Santiago sobre el estado de propiedades y jugador local
+  if (window.SantiagoMapAnimation) {
+    window.SantiagoMapAnimation.updateGameState(state, myPlayerId);
+  }
 
   // Mis Propiedades
   renderMyProperties(state);

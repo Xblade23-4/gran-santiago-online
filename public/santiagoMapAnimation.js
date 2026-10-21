@@ -1,7 +1,10 @@
 /**
  * santiagoMapAnimation.js
  * Mapa interactivo y animado de Santiago de Chile para el centro del tablero.
- * - Incluye las 40 casillas/tarjetas del Gran Santiago con sus coordenadas geográficas reales.
+ * - Incluye las 40 casillas/tarjetas del Gran Santiago agrupadas por cercanía geográfica.
+ * - Trazado de ruta completo conectando cada uno de los puntos del mapa.
+ * - Resalte dinámico de propiedades compradas: halo de color del dueño y desplazamiento
+ *   hacia el centro de la pantalla para identificar inmediatamente las propiedades del jugador.
  * - Soporta Modo Claro (Daylight) y Modo Oscuro (Night).
  * - Muestra en tiempo real el desplazamiento de los jugadores de punto a punto en Santiago.
  * - Anima los buses Transantiago / Red Movilidad por las avenidas con faros y estelas.
@@ -17,48 +20,52 @@
   let isRunning = false;
   let currentTheme = localStorage.getItem('gso_theme') || 'dark';
 
-  // Coordenadas geográficas normalizadas [0..1] para las 40 casillas/tarjetas en el plano de Santiago
+  let currentRoomState = null;
+  let currentMyPlayerId = null;
+
+  // Coordenadas geográficas normalizadas [0..1] para las 40 casillas/tarjetas del Gran Santiago
+  // Agrupadas por estricta cercanía comunal
   const SANTIAGO_POINTS = [
-    { id: 0, name: 'Plaza Baquedano', comuna: 'Santiago / Providencia', x: 0.53, y: 0.48, color: '#ef4444', icon: '🇨🇱', type: 'go' },
-    { id: 1, name: 'Av. Pajaritos', comuna: 'Maipú', x: 0.12, y: 0.62, color: '#9333ea', icon: '🐦', type: 'property' },
+    { id: 0, name: 'Plaza Baquedano', comuna: 'Santiago Centro / Providencia', x: 0.53, y: 0.48, color: '#ef4444', icon: '🇨🇱', type: 'go' },
+    { id: 1, name: 'Av. Pajaritos', comuna: 'Maipú', x: 0.12, y: 0.62, color: '#8b4513', icon: '🐦', type: 'property' },
     { id: 2, name: 'Polla Chilena', comuna: 'Santiago Centro', x: 0.43, y: 0.50, color: '#0284c7', icon: '🎰', type: 'community' },
-    { id: 3, name: 'Gran Avenida', comuna: 'San Miguel / La Cisterna', x: 0.41, y: 0.88, color: '#9333ea', icon: '🛣️', type: 'property' },
+    { id: 3, name: 'Gran Avenida', comuna: 'San Miguel', x: 0.40, y: 0.82, color: '#8b4513', icon: '🛣️', type: 'property' },
     { id: 4, name: 'Impuesto SII', comuna: 'Teatinos', x: 0.38, y: 0.52, color: '#f59e0b', icon: '💸', type: 'tax' },
     { id: 5, name: 'Metro Estación Central', comuna: 'Estación Central', x: 0.23, y: 0.58, color: '#dc2626', icon: '🚆', type: 'station' },
-    { id: 6, name: 'Barrio Patronato', comuna: 'Recoleta', x: 0.51, y: 0.38, color: '#0284c7', icon: '🧵', type: 'property' },
+    { id: 6, name: 'Barrio Patronato', comuna: 'Recoleta', x: 0.50, y: 0.36, color: '#38bdf8', icon: '🧵', type: 'property' },
     { id: 7, name: '¡Aló Santiago!', comuna: 'Centro', x: 0.47, y: 0.45, color: '#eab308', icon: '❓', type: 'chance' },
-    { id: 8, name: 'Av. Independencia', comuna: 'Independencia', x: 0.44, y: 0.26, color: '#0284c7', icon: '🏛️', type: 'property' },
-    { id: 9, name: 'Persa Biobío', comuna: 'Franklin', x: 0.44, y: 0.72, color: '#0284c7', icon: '📻', type: 'property' },
+    { id: 8, name: 'Av. Independencia', comuna: 'Independencia', x: 0.44, y: 0.26, color: '#38bdf8', icon: '🏛️', type: 'property' },
+    { id: 9, name: 'Av. Dorsal', comuna: 'Conchalí', x: 0.42, y: 0.18, color: '#38bdf8', icon: '🛣️', type: 'property' },
     { id: 10, name: 'Comisaría / De Visita', comuna: 'Santiago Centro', x: 0.34, y: 0.56, color: '#64748b', icon: '🚓', type: 'jail' },
-    { id: 11, name: 'Av. Vicuña Mackenna', comuna: 'Ñuñoa / San Joaquín', x: 0.58, y: 0.64, color: '#ec4899', icon: '🌳', type: 'property' },
+    { id: 11, name: 'Av. Vicuña Mackenna', comuna: 'La Florida', x: 0.60, y: 0.68, color: '#ec4899', icon: '🌳', type: 'property' },
     { id: 12, name: 'Enel Distribución', comuna: 'Santa Rosa', x: 0.47, y: 0.58, color: '#eab308', icon: '⚡', type: 'utility' },
-    { id: 13, name: 'Plaza de Puente Alto', comuna: 'Puente Alto', x: 0.79, y: 0.94, color: '#ec4899', icon: '🏔️', type: 'property' },
-    { id: 14, name: 'Av. Macul', comuna: 'Macul', x: 0.65, y: 0.74, color: '#ec4899', icon: '🏡', type: 'property' },
+    { id: 13, name: 'Plaza de Puente Alto', comuna: 'Puente Alto', x: 0.78, y: 0.94, color: '#ec4899', icon: '🏔️', type: 'property' },
+    { id: 14, name: 'La Pintana', comuna: 'La Pintana', x: 0.54, y: 0.90, color: '#ec4899', icon: '🏘️', type: 'property' },
     { id: 15, name: 'Metro Cal y Canto', comuna: 'Santiago Norte', x: 0.42, y: 0.40, color: '#dc2626', icon: '🚇', type: 'station' },
-    { id: 16, name: 'Barrio República', comuna: 'Santiago Centro', x: 0.32, y: 0.58, color: '#ea580c', icon: '🏰', type: 'property' },
+    { id: 16, name: 'Barrio República', comuna: 'Santiago Poniente', x: 0.34, y: 0.58, color: '#f97316', icon: '🏰', type: 'property' },
     { id: 17, name: 'Polla Chilena', comuna: 'Santiago Centro', x: 0.44, y: 0.49, color: '#0284c7', icon: '🎰', type: 'community' },
-    { id: 18, name: 'Barrio Brasil', comuna: 'Santiago Poniente', x: 0.35, y: 0.45, color: '#ea580c', icon: '⛲', type: 'property' },
-    { id: 19, name: 'Barrio Bellavista', comuna: 'Pío Nono / Recoleta', x: 0.56, y: 0.41, color: '#ea580c', icon: '🎭', type: 'property' },
-    { id: 20, name: "Parque O'Higgins", comuna: 'Rondizzoni', x: 0.38, y: 0.75, color: '#10b981', icon: '🎡', type: 'freeparking' },
+    { id: 18, name: 'Barrio Brasil', comuna: 'Santiago Poniente', x: 0.35, y: 0.48, color: '#f97316', icon: '⛲', type: 'property' },
+    { id: 19, name: 'Barrio Yungay', comuna: 'Santiago Poniente', x: 0.28, y: 0.48, color: '#f97316', icon: '🎭', type: 'property' },
+    { id: 20, name: "Parque O'Higgins", comuna: 'Rondizzoni', x: 0.38, y: 0.74, color: '#10b981', icon: '🎡', type: 'freeparking' },
     { id: 21, name: 'Paseo Ahumada', comuna: 'Santiago Centro', x: 0.44, y: 0.52, color: '#ef4444', icon: '🛍️', type: 'property' },
     { id: 22, name: '¡Aló Santiago!', comuna: 'Centro Oriente', x: 0.60, y: 0.44, color: '#eab308', icon: '❓', type: 'chance' },
     { id: 23, name: 'Barrio Lastarria', comuna: 'Santa Lucía', x: 0.50, y: 0.49, color: '#ef4444', icon: '☕', type: 'property' },
-    { id: 24, name: 'Alameda B. O\'Higgins', comuna: 'Eje Cívico', x: 0.38, y: 0.54, color: '#ef4444', icon: '🇨🇱', type: 'property' },
+    { id: 24, name: 'Alameda B. O\'Higgins', comuna: 'Eje Cívico', x: 0.40, y: 0.54, color: '#ef4444', icon: '🇨🇱', type: 'property' },
     { id: 25, name: 'Metro Plaza Egaña', comuna: 'La Reina / Ñuñoa', x: 0.76, y: 0.58, color: '#dc2626', icon: '🚇', type: 'station' },
     { id: 26, name: 'Plaza Ñuñoa (Irarrázaval)', comuna: 'Ñuñoa', x: 0.66, y: 0.61, color: '#eab308', icon: '🏛️', type: 'property' },
     { id: 27, name: 'Barrio Italia', comuna: 'Providencia / Ñuñoa', x: 0.58, y: 0.53, color: '#eab308', icon: '🎨', type: 'property' },
     { id: 28, name: 'Aguas Andinas', comuna: 'Cordillera', x: 0.86, y: 0.28, color: '#06b6d4', icon: '💧', type: 'utility' },
-    { id: 29, name: 'Parque Forestal', comuna: 'Santiago Centro', x: 0.48, y: 0.46, color: '#eab308', icon: '🍃', type: 'property' },
+    { id: 29, name: 'Av. Macul', comuna: 'Macul', x: 0.65, y: 0.74, color: '#eab308', icon: '🏡', type: 'property' },
     { id: 30, name: 'Control Carabineros', comuna: 'Vespucio Norte', x: 0.30, y: 0.22, color: '#ef4444', icon: '🚨', type: 'gotojail' },
-    { id: 31, name: 'Av. Providencia', comuna: 'Providencia', x: 0.65, y: 0.44, color: '#16a34a', icon: '🏬', type: 'property' },
-    { id: 32, name: 'Pedro de Valdivia Norte', comuna: 'Providencia', x: 0.62, y: 0.37, color: '#16a34a', icon: '🌲', type: 'property' },
+    { id: 31, name: 'Av. Providencia', comuna: 'Providencia', x: 0.65, y: 0.44, color: '#22c55e', icon: '🏬', type: 'property' },
+    { id: 32, name: 'Pedro de Valdivia Norte', comuna: 'Providencia', x: 0.62, y: 0.37, color: '#22c55e', icon: '🌲', type: 'property' },
     { id: 33, name: 'Polla Chilena', comuna: 'Santiago Centro', x: 0.46, y: 0.53, color: '#0284c7', icon: '🎰', type: 'community' },
-    { id: 34, name: 'Av. Apoquindo (El Golf)', comuna: 'Las Condes', x: 0.78, y: 0.36, color: '#16a34a', icon: '💼', type: 'property' },
+    { id: 34, name: 'Barrio Bellavista', comuna: 'Providencia', x: 0.56, y: 0.41, color: '#22c55e', icon: '🎭', type: 'property' },
     { id: 35, name: 'Metro Tobalaba', comuna: 'Sanhattan', x: 0.73, y: 0.39, color: '#dc2626', icon: '🚇', type: 'station' },
     { id: 36, name: '¡Aló Santiago!', comuna: 'Cordillera', x: 0.82, y: 0.32, color: '#eab308', icon: '❓', type: 'chance' },
-    { id: 37, name: 'Av. Alonso de Córdova', comuna: 'Vitacura', x: 0.82, y: 0.23, color: '#2563eb', icon: '💎', type: 'property' },
+    { id: 37, name: 'Av. Alonso de Córdova', comuna: 'Vitacura', x: 0.82, y: 0.23, color: '#3b82f6', icon: '💎', type: 'property' },
     { id: 38, name: 'TAG Costanera Norte', comuna: 'Ruta Río', x: 0.68, y: 0.33, color: '#f59e0b', icon: '💳', type: 'tax' },
-    { id: 39, name: 'Sanhattan (Costanera)', comuna: 'Las Condes', x: 0.74, y: 0.37, color: '#2563eb', icon: '🏙️', type: 'property' }
+    { id: 39, name: 'Sanhattan (Costanera)', comuna: 'Las Condes', x: 0.74, y: 0.37, color: '#3b82f6', icon: '🏙️', type: 'property' }
   ];
 
   // Rutas de buses Transantiago / Red
@@ -72,10 +79,10 @@
       path: [
         { x: 0.12, y: 0.62 }, // Pajaritos
         { x: 0.23, y: 0.58 }, // Est. Central
-        { x: 0.38, y: 0.54 }, // Alameda
+        { x: 0.40, y: 0.54 }, // Alameda
         { x: 0.53, y: 0.48 }, // Baquedano
         { x: 0.65, y: 0.44 }, // Providencia
-        { x: 0.78, y: 0.36 }, // Apoquindo
+        { x: 0.74, y: 0.37 }, // Sanhattan
         { x: 0.82, y: 0.23 }  // Alonso de Córdova
       ]
     },
@@ -87,9 +94,10 @@
       speed: 0.046,
       path: [
         { x: 0.53, y: 0.48 }, // Baquedano
-        { x: 0.58, y: 0.64 }, // Vicuña Mackenna
+        { x: 0.60, y: 0.68 }, // Vicuña Mackenna
         { x: 0.65, y: 0.74 }, // Macul
-        { x: 0.79, y: 0.94 }  // Puente Alto
+        { x: 0.54, y: 0.90 }, // La Pintana
+        { x: 0.78, y: 0.94 }  // Puente Alto
       ]
     },
     {
@@ -99,11 +107,12 @@
       busColor: '#2563eb',
       speed: 0.058,
       path: [
+        { x: 0.42, y: 0.18 }, // Conchalí
         { x: 0.44, y: 0.26 }, // Independencia
         { x: 0.42, y: 0.40 }, // Cal y Canto
-        { x: 0.38, y: 0.54 }, // Alameda
-        { x: 0.38, y: 0.75 }, // Parque O'Higgins
-        { x: 0.41, y: 0.88 }  // Gran Avenida
+        { x: 0.40, y: 0.54 }, // Alameda
+        { x: 0.38, y: 0.74 }, // Parque O'Higgins
+        { x: 0.40, y: 0.82 }  // Gran Avenida
       ]
     },
     {
@@ -114,12 +123,12 @@
       speed: 0.048,
       path: [
         { x: 0.30, y: 0.22 },
-        { x: 0.50, y: 0.16 },
+        { x: 0.42, y: 0.18 },
         { x: 0.76, y: 0.20 },
         { x: 0.86, y: 0.28 },
         { x: 0.76, y: 0.58 },
         { x: 0.65, y: 0.74 },
-        { x: 0.41, y: 0.88 }
+        { x: 0.40, y: 0.82 }
       ]
     }
   ];
@@ -134,7 +143,7 @@
 
   // Registro de jugadores y sus movimientos en el mapa
   const playerMapPositions = {}; // { [playerId]: { tileId, currentX, currentY, targetX, targetY, avatar, name, moving, timer, pulse } }
-  let activeMovementCallout = null; // { text, icon, timestamp, color }
+  let activeMovementCallout = null;
   let hoveredPointId = null;
 
   function samplePathPoint(path, t) {
@@ -164,7 +173,11 @@
     }
   }
 
-  // Actualiza o inicializa la posición de los jugadores en el mapa
+  function updateGameState(state, myPlayerId) {
+    currentRoomState = state;
+    currentMyPlayerId = myPlayerId;
+  }
+
   function setPlayerTile(playerId, playerName, playerAvatar, tileId, isMoving = false) {
     const pt = SANTIAGO_POINTS[tileId] || SANTIAGO_POINTS[0];
     const existing = playerMapPositions[playerId];
@@ -194,7 +207,6 @@
       existing.moving = true;
       existing.pulse = 2.0;
 
-      // Anunciar el movimiento en el mapa de Santiago
       activeMovementCallout = {
         text: `${existing.avatar} ${existing.name} en ${pt.name} (${pt.comuna})`,
         icon: pt.icon || '📍',
@@ -204,7 +216,6 @@
     }
   }
 
-  // Paleta de colores según tema Claro / Oscuro
   function getThemeColors() {
     const isLight = currentTheme === 'light';
     return {
@@ -223,12 +234,16 @@
       roadGlow: isLight ? 'rgba(203, 213, 225, 0.7)' : 'rgba(255, 255, 255, 0.08)',
       roadBase: isLight ? '#94a3b8' : 'rgba(51, 65, 85, 0.9)',
       roadDash: isLight ? '#f59e0b' : 'rgba(250, 204, 21, 0.45)',
+      circuitCasing: isLight ? 'rgba(37, 99, 235, 0.2)' : 'rgba(56, 189, 248, 0.22)',
+      circuitRoad: isLight ? '#cbd5e1' : 'rgba(30, 41, 59, 0.85)',
+      circuitLine: isLight ? '#2563eb' : '#38bdf8',
+      circuitPulse: isLight ? '#fbbf24' : '#facc15',
       sanCristobal: isLight ? 'rgba(34, 197, 94, 0.35)' : 'rgba(16, 185, 129, 0.3)',
       textMain: isLight ? '#0f172a' : '#f8fafc',
       textMuted: isLight ? '#475569' : '#94a3b8',
       pointBg: isLight ? '#ffffff' : '#0f172a',
       pointBorder: isLight ? '#64748b' : '#38bdf8',
-      bannerBg: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 23, 42, 0.88)',
+      bannerBg: isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(15, 23, 42, 0.9)',
       bannerBorder: isLight ? 'rgba(148, 163, 184, 0.45)' : 'rgba(255, 255, 255, 0.15)'
     };
   }
@@ -336,75 +351,211 @@
     ctx.lineWidth = 1.6;
     ctx.stroke();
     ctx.restore();
+  }
 
-    // 7. Trazado de las grandes avenidas de Santiago
-    MAP_ROUTES.forEach((route) => {
-      ctx.save();
-      ctx.strokeStyle = colors.roadGlow;
-      ctx.lineWidth = 7;
-      ctx.beginPath();
-      route.path.forEach((pt, idx) => {
-        const px = pt.x * w;
-        const py = pt.y * h;
-        if (idx === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      });
-      ctx.stroke();
+  // TRAZADO COMPLETO DE LA RUTA POR CADA PUNTO DEL MAPA (Los 40 puntos conectados en circuito)
+  function drawFullCircuitRoute(w, h, time, colors) {
+    if (SANTIAGO_POINTS.length < 2) return;
 
-      ctx.strokeStyle = colors.roadBase;
-      ctx.lineWidth = 3.2;
-      ctx.stroke();
-
-      ctx.strokeStyle = colors.roadDash;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 6]);
-      ctx.stroke();
-      ctx.restore();
+    ctx.save();
+    // 1. Resplandor base del trazado vial completo
+    ctx.strokeStyle = colors.circuitCasing;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    SANTIAGO_POINTS.forEach((pt, idx) => {
+      const px = pt.x * w;
+      const py = pt.y * h;
+      if (idx === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
     });
+    // Cerrar el circuito de vuelta a la Partida (punto 0)
+    ctx.lineTo(SANTIAGO_POINTS[0].x * w, SANTIAGO_POINTS[0].y * h);
+    ctx.stroke();
+
+    // 2. Línea asfáltica principal del circuito
+    ctx.strokeStyle = colors.circuitRoad;
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+
+    // 3. Demarcación animada discontinua (flujo de energía / tránsito continuo)
+    ctx.strokeStyle = colors.circuitLine;
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([7, 6]);
+    ctx.lineDashOffset = -time * 0.016; // Flujo animado
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 4. Pulso de energía luminoso que recorre el circuito de puntos
+    const circuitProgress = ((time * 0.00015) % 1.0);
+    const pulsePt = samplePathPoint(SANTIAGO_POINTS, circuitProgress);
+    ctx.fillStyle = colors.circuitPulse;
+    ctx.shadowColor = colors.circuitPulse;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(pulsePt.x * w, pulsePt.y * h, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   // Dibuja los 40 puntos geográficos de las tarjetas del Gran Santiago
+  // Resalta las propiedades del jugador con halo dorado y desplazamiento al centro
   function drawSantiagoPoints(w, h, time, colors) {
+    const centerX = w * 0.5;
+    const centerY = h * 0.5;
+
     SANTIAGO_POINTS.forEach((pt) => {
-      const px = pt.x * w;
-      const py = pt.y * h;
+      const origPx = pt.x * w;
+      const origPy = pt.y * h;
       const isHovered = hoveredPointId === pt.id;
 
-      // Círculo base del nodo
+      // Estado de propiedad en la partida
+      const propState = currentRoomState?.properties?.[pt.id];
+      const ownerId = propState?.ownerId;
+      const isOwnedByMe = Boolean(ownerId && currentMyPlayerId && ownerId === currentMyPlayerId);
+      const isOwnedByOther = Boolean(ownerId && (!currentMyPlayerId || ownerId !== currentMyPlayerId));
+      const owner = isOwnedByOther ? currentRoomState?.players?.find((p) => p.id === ownerId) : null;
+
+      // Calcular acercamiento de píxeles hacia el centro de la pantalla
+      let finalPx = origPx;
+      let finalPy = origPy;
+
+      if (isOwnedByMe) {
+        // Desplazar 9 píxeles hacia el centro de Santiago para que destaque físicamente
+        const dx = centerX - origPx;
+        const dy = centerY - origPy;
+        const dist = Math.hypot(dx, dy) || 1;
+        finalPx = origPx + (dx / dist) * 10;
+        finalPy = origPy + (dy / dist) * 10;
+      } else if (isOwnedByOther) {
+        // Desplazar 4.5 píxeles hacia el centro
+        const dx = centerX - origPx;
+        const dy = centerY - origPy;
+        const dist = Math.hypot(dx, dy) || 1;
+        finalPx = origPx + (dx / dist) * 5;
+        finalPy = origPy + (dy / dist) * 5;
+      }
+
       ctx.save();
-      ctx.fillStyle = colors.pointBg;
-      ctx.strokeStyle = isHovered ? '#f59e0b' : pt.color;
-      ctx.lineWidth = isHovered ? 2.5 : 1.4;
 
-      // Anillo de pulso sutil para casillas clave (Baquedano, Costanera, Fonda)
-      if (pt.id === 0 || pt.id === 20 || pt.id === 39) {
-        const pulseR = 7 + Math.sin(time * 0.004 + pt.id) * 3;
+      // ================= CASO 1: PROPIEDAD DEL JUGADOR LOCAL (RESALTADO MÁXIMO) =================
+      if (isOwnedByMe) {
+        // 1. Halo dorado / ámbar resplandeciente con pulso
+        const glowRadius = 12 + Math.sin(time * 0.005) * 3.5;
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = '#f59e0b';
+        ctx.shadowBlur = 14;
         ctx.beginPath();
-        ctx.arc(px, py, pulseR, 0, Math.PI * 2);
-        ctx.strokeStyle = isHovered ? 'rgba(245, 158, 11, 0.45)' : `${pt.color}55`;
-        ctx.lineWidth = 1;
+        ctx.arc(finalPx, finalPy, glowRadius, 0, Math.PI * 2);
         ctx.stroke();
+
+        // 2. Línea guía punteada conectando el punto original desplazado
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        ctx.moveTo(origPx, origPy);
+        ctx.lineTo(finalPx, finalPy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 3. Nodo central dorado grande
+        ctx.fillStyle = '#fef08a';
+        ctx.strokeStyle = '#d97706';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(finalPx, finalPy, 7.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // 4. Badge flotante: 🔑 TÚ / Edificaciones
+        ctx.fillStyle = '#f59e0b';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        let deedTag = '🔑 MÍA';
+        if (propState.houses === 5) deedTag = '🏨 HOTEL';
+        else if (propState.houses > 0) deedTag = `🏠 ${propState.houses}`;
+
+        ctx.font = 'bold 8px system-ui, sans-serif';
+        const tagW = ctx.measureText(deedTag).width + 8;
+        ctx.beginPath();
+        ctx.roundRect(finalPx - tagW / 2, finalPy - 22, tagW, 12, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(deedTag, finalPx, finalPy - 16);
+
+        // Nombre de la propiedad destacado
+        ctx.fillStyle = colors.isLight ? '#0f172a' : '#fde047';
+        ctx.font = 'bold 8.5px system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${pt.name}`, finalPx + 11, finalPy + 3);
+      }
+      // ================= CASO 2: PROPIEDAD DE UN OPONENTE =================
+      else if (isOwnedByOther && owner) {
+        const ownerColor = owner.avatar?.color || '#ef4444';
+
+        // Anillo con el color del oponente
+        ctx.strokeStyle = ownerColor;
+        ctx.lineWidth = 2.2;
+        ctx.fillStyle = colors.pointBg;
+        ctx.beginPath();
+        ctx.arc(finalPx, finalPy, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Mini avatar o inicial del dueño
+        ctx.font = '7.5px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(owner.avatar?.icon || '👤', finalPx, finalPy);
+
+        if (isHovered) {
+          ctx.fillStyle = ownerColor;
+          ctx.font = 'bold 8px system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(`🏢 ${pt.name} (${owner.name})`, finalPx + 9, finalPy + 3);
+        }
+      }
+      // ================= CASO 3: PROPIEDAD O CASILLA DISPONIBLE / ESPECIAL =================
+      else {
+        ctx.fillStyle = colors.pointBg;
+        ctx.strokeStyle = isHovered ? '#f59e0b' : pt.color;
+        ctx.lineWidth = isHovered ? 2.5 : 1.2;
+
+        if (pt.id === 0 || pt.id === 20 || pt.id === 39) {
+          const pulseR = 7 + Math.sin(time * 0.004 + pt.id) * 3;
+          ctx.beginPath();
+          ctx.arc(finalPx, finalPy, pulseR, 0, Math.PI * 2);
+          ctx.strokeStyle = isHovered ? 'rgba(245, 158, 11, 0.45)' : `${pt.color}55`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
+        ctx.beginPath();
+        ctx.arc(finalPx, finalPy, isHovered ? 5.5 : 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        const isMajor = pt.id === 0 || pt.id === 1 || pt.id === 5 || pt.id === 13 || pt.id === 20 || pt.id === 26 || pt.id === 31 || pt.id === 39;
+        if (isHovered || isMajor) {
+          ctx.fillStyle = isHovered ? '#fbbf24' : colors.textMuted;
+          ctx.font = isHovered ? 'bold 8.5px system-ui, sans-serif' : '7.5px system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(`${pt.icon} ${pt.name}`, finalPx + 7, finalPy + 3);
+        }
       }
 
-      ctx.beginPath();
-      ctx.arc(px, py, isHovered ? 6 : 4.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
       ctx.restore();
-
-      // En Modo Claro / Hover o casillas destacadas, mostrar etiqueta con el nombre del lugar
-      const isMajor = pt.id === 0 || pt.id === 1 || pt.id === 5 || pt.id === 9 || pt.id === 13 || pt.id === 20 || pt.id === 26 || pt.id === 31 || pt.id === 39;
-      if (isHovered || isMajor) {
-        ctx.save();
-        ctx.fillStyle = isHovered ? '#fbbf24' : colors.textMuted;
-        ctx.font = isHovered ? 'bold 8.5px system-ui, sans-serif' : '7.5px system-ui, sans-serif';
-        ctx.fillText(`${pt.icon} ${pt.name}`, px + 7, py + 3);
-        ctx.restore();
-      }
     });
   }
 
-  // Dibuja los buses Transantiago / Red Movilidad
   function drawBus(bus, w, h, time, colors) {
     const pt = samplePathPoint(bus.route.path, bus.progress);
     const px = pt.x * w;
@@ -481,13 +632,11 @@
     ctx.restore();
   }
 
-  // Dibuja los jugadores en su posición exacta del mapa de Santiago
   function drawPlayersOnMap(w, h, time, delta, colors) {
-    Object.keys(playerMapPositions).forEach((pId, idx) => {
+    Object.keys(playerMapPositions).forEach((pId) => {
       const p = playerMapPositions[pId];
       if (!p) return;
 
-      // Interpolación suave si el jugador se está desplazando hacia un nuevo punto
       const targetPx = p.targetX * w;
       const targetPy = p.targetY * h;
       let currentPx = p.currentX * w;
@@ -500,7 +649,6 @@
         currentPx = p.currentX * w;
         currentPy = p.currentY * h;
 
-        // Estela / línea de trayectoria hacia el destino
         ctx.save();
         ctx.strokeStyle = '#38bdf8';
         ctx.lineWidth = 1.5;
@@ -514,7 +662,6 @@
         p.moving = false;
       }
 
-      // Ondas concéntricas (Radar Ping) cuando se mueve
       if (p.pulse > 1.0) {
         p.pulse -= delta * 0.8;
         const pingRadius = 10 + (2.0 - p.pulse) * 20;
@@ -527,9 +674,7 @@
         ctx.restore();
       }
 
-      // Pin / Avatar del Jugador sobre Santiago
       ctx.save();
-      // Glow exterior
       ctx.shadowColor = '#38bdf8';
       ctx.shadowBlur = 8;
       ctx.fillStyle = colors.bannerBg;
@@ -537,19 +682,16 @@
       ctx.arc(currentPx, currentPy - 10, 11, 0, Math.PI * 2);
       ctx.fill();
 
-      // Borde del pin con color único
       ctx.strokeStyle = '#2563eb';
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Icono de Avatar
       ctx.font = '12px system-ui';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(p.avatar || '👤', currentPx, currentPy - 10);
 
-      // Flecha indicadora apuntando al punto exacto
       ctx.fillStyle = '#2563eb';
       ctx.beginPath();
       ctx.moveTo(currentPx - 3.5, currentPy);
@@ -558,7 +700,6 @@
       ctx.closePath();
       ctx.fill();
 
-      // Etiqueta con el nombre del jugador
       ctx.fillStyle = colors.bannerBg;
       ctx.strokeStyle = colors.bannerBorder;
       ctx.lineWidth = 1;
@@ -575,7 +716,6 @@
     });
   }
 
-  // Notificación flotante en el mapa cuando un jugador se desplaza
   function drawMovementCallout(w, h, time, colors) {
     if (!activeMovementCallout) return;
     const age = (Date.now() - activeMovementCallout.timestamp) / 1000;
@@ -628,13 +768,16 @@
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    // 1. Mapa cartográfico de base (valle, cerros, río, avenidas)
+    // 1. Mapa cartográfico de base (valle, cerros, río)
     drawBackgroundMap(w, h, timestamp, colors);
 
-    // 2. Puntos reales de las 40 tarjetas/casillas de Gran Santiago
+    // 2. TRAZADO DE RUTA COMPLETO POR CADA PUNTO DEL MAPA (Los 40 puntos conectados en circuito)
+    drawFullCircuitRoute(w, h, timestamp, colors);
+
+    // 3. Puntos reales de las 40 tarjetas con resalte de propiedades compradas y acercamiento
     drawSantiagoPoints(w, h, timestamp, colors);
 
-    // 3. Buses Transantiago / Red recorriendo las calles
+    // 4. Buses Transantiago / Red recorriendo las calles
     buses.forEach((bus) => {
       if (bus.pauseTimer > 0) {
         bus.pauseTimer -= delta;
@@ -653,10 +796,10 @@
       drawBus(bus, w, h, timestamp, colors);
     });
 
-    // 4. Jugadores moviéndose sobre el mapa
+    // 5. Jugadores moviéndose sobre el mapa
     drawPlayersOnMap(w, h, timestamp, delta, colors);
 
-    // 5. Notificación activa de movimiento
+    // 6. Notificación activa de movimiento
     drawMovementCallout(w, h, timestamp, colors);
 
     ctx.restore();
@@ -680,7 +823,7 @@
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Detección de hover sobre los puntos de las tarjetas
+    // Detección de hover sobre los puntos de las tarjetas (considerando el acercamiento al centro)
     canvas.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -688,12 +831,24 @@
       const h = canvas.height / dpr;
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
+      const centerX = w * 0.5;
+      const centerY = h * 0.5;
 
       let found = null;
       for (const pt of SANTIAGO_POINTS) {
-        const px = pt.x * w;
-        const py = pt.y * h;
-        if (Math.hypot(mouseX - px, mouseY - py) < 14) {
+        let px = pt.x * w;
+        let py = pt.y * h;
+        const propState = currentRoomState?.properties?.[pt.id];
+        if (propState?.ownerId) {
+          const isOwnedByMe = propState.ownerId === currentMyPlayerId;
+          const dx = centerX - px;
+          const dy = centerY - py;
+          const dist = Math.hypot(dx, dy) || 1;
+          const shift = isOwnedByMe ? 10 : 5;
+          px += (dx / dist) * shift;
+          py += (dy / dist) * shift;
+        }
+        if (Math.hypot(mouseX - px, mouseY - py) < 15) {
           found = pt.id;
           break;
         }
@@ -705,8 +860,7 @@
       hoveredPointId = null;
     });
 
-    // Clic en un punto abre el modal de inspección de la propiedad
-    canvas.addEventListener('click', (e) => {
+    canvas.addEventListener('click', () => {
       if (hoveredPointId !== null && typeof window.openPropertyModal === 'function') {
         window.openPropertyModal(hoveredPointId);
       }
@@ -745,6 +899,7 @@
     resize: resizeCanvas,
     setTheme: setTheme,
     setPlayerTile: setPlayerTile,
+    updateGameState: updateGameState,
     SANTIAGO_POINTS: SANTIAGO_POINTS
   };
 

@@ -4,14 +4,14 @@
  */
 
 const COLOR_GROUPS = {
-  brown:   { name: 'Sector Sur-Poniente', color: '#8B4513', total: 2 },
-  lblue:   { name: 'Sector Norte / Centro', color: '#38BDF8', total: 3 },
-  pink:    { name: 'Sector Sur-Oriente', color: '#EC4899', total: 3 },
-  orange:  { name: 'Eje Universitario y Bohemio', color: '#F97316', total: 3 },
-  red:     { name: 'Casco Histórico', color: '#EF4444', total: 3 },
-  yellow:  { name: 'Sector Oriente Residencial', color: '#EAB308', total: 3 },
-  green:   { name: 'Sector Oriente Comercial', color: '#22C55E', total: 3 },
-  dblue:   { name: 'Barrio Alto Financiero', color: '#3B82F6', total: 2 },
+  brown:   { name: 'Sector Sur-Poniente (Maipú y San Miguel)', color: '#8B4513', total: 2 },
+  lblue:   { name: 'Sector Norte (Recoleta, Independencia y Conchalí)', color: '#38BDF8', total: 3 },
+  pink:    { name: 'Sector Sur-Oriente (La Florida, Puente Alto y La Pintana)', color: '#EC4899', total: 3 },
+  orange:  { name: 'Barrios Patrimoniales Poniente (República, Brasil y Yungay)', color: '#F97316', total: 3 },
+  red:     { name: 'Casco Histórico Cívico (Ahumada, Lastarria y Alameda)', color: '#EF4444', total: 3 },
+  yellow:  { name: 'Sector Oriente Central (Ñuñoa, Macul y Barrio Italia)', color: '#EAB308', total: 3 },
+  green:   { name: 'Sector Providencia (Av. Providencia, Pedro de Valdivia y Bellavista)', color: '#22C55E', total: 3 },
+  dblue:   { name: 'Barrio Alto Financiero (Las Condes y Vitacura)', color: '#3B82F6', total: 2 },
   station: { name: 'Red Metro de Santiago', color: '#E11D48', total: 4 },
   utility: { name: 'Servicios Básicos', color: '#A855F7', total: 2 }
 };
@@ -113,8 +113,9 @@ const BOARD_TILES = [
   },
   {
     id: 9,
-    name: 'Barrio Franklin (Persa Biobío)',
-    comuna: 'Santiago Sur',
+    name: 'Av. Dorsal (Conchalí)',
+    shortName: 'Av. Dorsal',
+    comuna: 'Conchalí',
     type: 'property',
     group: 'lblue',
     price: 120000,
@@ -161,8 +162,9 @@ const BOARD_TILES = [
   },
   {
     id: 14,
-    name: 'Av. Macul',
-    comuna: 'Macul',
+    name: 'Av. Santa Rosa (La Pintana)',
+    shortName: 'La Pintana',
+    comuna: 'La Pintana',
     type: 'property',
     group: 'pink',
     price: 160000,
@@ -209,8 +211,9 @@ const BOARD_TILES = [
   },
   {
     id: 19,
-    name: 'Barrio Bellavista (Pío Nono)',
-    comuna: 'Providencia / Recoleta',
+    name: 'Barrio Yungay (Plaza Yungay)',
+    shortName: 'Barrio Yungay',
+    comuna: 'Santiago Poniente',
     type: 'property',
     group: 'orange',
     price: 200000,
@@ -305,8 +308,9 @@ const BOARD_TILES = [
   },
   {
     id: 29,
-    name: 'Parque Forestal',
-    comuna: 'Santiago / Providencia',
+    name: 'Av. Macul (Macul / Ñuñoa)',
+    shortName: 'Av. Macul',
+    comuna: 'Macul',
     type: 'property',
     group: 'yellow',
     price: 280000,
@@ -351,8 +355,9 @@ const BOARD_TILES = [
   },
   {
     id: 34,
-    name: 'Av. Apoquindo (El Golf)',
-    comuna: 'Las Condes',
+    name: 'Barrio Bellavista (Pío Nono)',
+    shortName: 'Bellavista',
+    comuna: 'Providencia',
     type: 'property',
     group: 'green',
     price: 320000,
