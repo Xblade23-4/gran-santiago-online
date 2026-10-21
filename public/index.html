@@ -2,7 +2,11 @@
 <html lang="es-CL">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0b1324" />
   <title>Gran Santiago Online 🚇🇨🇱 | Juego de Mesa Multijugador (2 a 8 Jugadores)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -311,7 +315,29 @@
       <iframe id="gameparty-frame" title="Crucigrama Party y Doodle Party"></iframe>
     </div>
 
-    <div id="main-game-layout" class="game-layout">
+    <!-- Header Rápido para Dispositivos Móviles -->
+    <header class="mobile-game-header" id="mobile-game-header">
+      <div class="mgh-left">
+        <span class="mgh-room-badge">🚇 <strong id="mobile-game-room-code">STGO-0000</strong></span>
+        <button type="button" id="btn-mobile-copy-link" class="btn-icon btn-xs" title="Copiar invitación">🔗</button>
+      </div>
+      <div class="mgh-center" id="mobile-turn-indicator">
+        <span class="mgh-turn-text">🎲 Gran Santiago</span>
+      </div>
+      <div class="mgh-right">
+        <button type="button" id="btn-mobile-theme" class="btn-icon btn-theme-toggle btn-xs" title="Modo Claro/Oscuro">🌙</button>
+        <button type="button" id="btn-mobile-sound" class="btn-icon btn-xs" title="Sonido">🔊</button>
+        <button type="button" id="btn-mobile-abandon" class="btn btn-danger-outline btn-xs" title="Votar abandonar">🏳️</button>
+      </div>
+    </header>
+
+    <!-- Alerta flotante cuando es el turno del jugador y no está en la pestaña del Tablero -->
+    <div id="mobile-my-turn-banner" class="mobile-my-turn-banner hidden" role="alert">
+      <span>🎲 <strong>¡Es tu turno!</strong> Toca para jugar</span>
+      <button type="button" id="btn-mobile-goto-board" class="btn btn-xs btn-primary">Ir al Tablero ➡️</button>
+    </div>
+
+    <div id="main-game-layout" class="game-layout" data-active-tab="board">
       <!-- COLUMNA IZQUIERDA: Jugadores, Billeteras CLP y Propiedades -->
       <aside class="sidebar sidebar-left">
         <div class="sidebar-header">
@@ -506,6 +532,28 @@
         </div>
       </aside>
     </div>
+
+    <!-- Barra de Pestañas Móviles (Bottom Navigation Bar) -->
+    <nav class="mobile-game-tabs" id="mobile-game-tabs" aria-label="Navegación móvil del juego">
+      <button type="button" class="mobile-tab-btn active" data-tab="board">
+        <span class="tab-icon">🎲</span>
+        <span class="tab-label">Tablero</span>
+      </button>
+      <button type="button" class="mobile-tab-btn" data-tab="players">
+        <span class="tab-icon">👥</span>
+        <span class="tab-label">Jugadores</span>
+      </button>
+      <button type="button" class="mobile-tab-btn" data-tab="props">
+        <span class="tab-icon">🏢</span>
+        <span class="tab-label">Escrituras</span>
+        <span id="mobile-props-badge" class="tab-badge-count">0</span>
+      </button>
+      <button type="button" class="mobile-tab-btn" data-tab="chat">
+        <span class="tab-icon">💬</span>
+        <span class="tab-label">Chat</span>
+        <span id="mobile-chat-badge" class="tab-badge-dot hidden"></span>
+      </button>
+    </nav>
   </section>
 
   <!-- ================= MODAL NATIVO: INSPECCIÓN DE PROPIEDAD Y EDIFICACIÓN ================= -->

@@ -164,8 +164,8 @@
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(Math.floor(rect.width), 300);
-    const height = Math.max(Math.floor(rect.height), 300);
+    const width = Math.max(Math.floor(rect.width), 160) || 300;
+    const height = Math.max(Math.floor(rect.height), 160) || 300;
 
     if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
       canvas.width = width * dpr;
@@ -823,18 +823,19 @@
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Detección de hover sobre los puntos de las tarjetas (considerando el acercamiento al centro)
-    canvas.addEventListener('mousemove', (e) => {
+    // Detección de hover y toque táctil sobre los puntos de las tarjetas
+    function detectPointAt(clientX, clientY) {
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const w = canvas.width / dpr;
       const h = canvas.height / dpr;
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+      const mouseX = clientX - rect.left;
+      const mouseY = clientY - rect.top;
       const centerX = w * 0.5;
       const centerY = h * 0.5;
 
       let found = null;
+      const hitRadius = window.matchMedia && window.matchMedia('(pointer: coarse)').matches ? 24 : 15;
       for (const pt of SANTIAGO_POINTS) {
         let px = pt.x * w;
         let py = pt.y * h;
@@ -848,13 +849,29 @@
           px += (dx / dist) * shift;
           py += (dy / dist) * shift;
         }
-        if (Math.hypot(mouseX - px, mouseY - py) < 15) {
+        if (Math.hypot(mouseX - px, mouseY - py) < hitRadius) {
           found = pt.id;
           break;
         }
       }
-      hoveredPointId = found;
+      return found;
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+      hoveredPointId = detectPointAt(e.clientX, e.clientY);
     });
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches[0]) {
+        const found = detectPointAt(e.touches[0].clientX, e.touches[0].clientY);
+        if (found !== null) {
+          hoveredPointId = found;
+          if (typeof window.openPropertyModal === 'function') {
+            window.openPropertyModal(found);
+          }
+        }
+      }
+    }, { passive: true });
 
     canvas.addEventListener('mouseleave', () => {
       hoveredPointId = null;

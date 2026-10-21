@@ -958,6 +958,55 @@ function bindUIEvents() {
   };
   document.getElementById('btn-copy-link').addEventListener('click', copyInviteLink);
   document.getElementById('btn-copy-game-link').addEventListener('click', copyInviteLink);
+  document.getElementById('btn-mobile-copy-link')?.addEventListener('click', copyInviteLink);
+
+  document.getElementById('btn-mobile-abandon')?.addEventListener('click', () => {
+    socket.emit('vote_abandon', {}, (res) => {
+      if (res && !res.ok) showToast(res.error);
+    });
+  });
+
+  document.getElementById('btn-mobile-sound')?.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    const btn = document.getElementById('btn-mobile-sound');
+    if (btn) btn.textContent = soundEnabled ? '🔊' : '🔇';
+    const deskBtn = document.getElementById('btn-toggle-sound');
+    if (deskBtn) deskBtn.textContent = soundEnabled ? '🔊' : '🔇';
+    showToast(soundEnabled ? 'Efectos de sonido activados' : 'Sonido silenciado');
+  });
+
+  // Pestañas de navegación móvil (Tablero / Jugadores / Escrituras / Chat)
+  const mobileTabBtns = document.querySelectorAll('.mobile-tab-btn');
+  const mainLayout = document.getElementById('main-game-layout');
+  const mobileChatBadge = document.getElementById('mobile-chat-badge');
+  const myTurnBanner = document.getElementById('mobile-my-turn-banner');
+
+  function setMobileActiveTab(tabKey) {
+    if (!mainLayout) return;
+    mainLayout.dataset.activeTab = tabKey;
+    mobileTabBtns.forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.tab === tabKey);
+    });
+    if (tabKey === 'chat' && mobileChatBadge) {
+      mobileChatBadge.classList.add('hidden');
+    }
+    if (tabKey === 'board' && myTurnBanner) {
+      myTurnBanner.classList.add('hidden');
+    }
+    if (tabKey === 'board' && window.SantiagoMapAnimation) {
+      setTimeout(() => window.SantiagoMapAnimation.resize(), 60);
+    }
+  }
+
+  mobileTabBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setMobileActiveTab(btn.dataset.tab);
+    });
+  });
+
+  document.getElementById('btn-mobile-goto-board')?.addEventListener('click', () => {
+    setMobileActiveTab('board');
+  });
 
   document.getElementById('btn-leave-lobby').addEventListener('click', () => {
     window.location.href = '/';
@@ -1830,6 +1879,9 @@ function renderLobby(state) {
 
 function renderGame(state) {
   document.getElementById('game-room-code').textContent = state.code;
+  const mobCode = document.getElementById('mobile-game-room-code');
+  if (mobCode) mobCode.textContent = state.code;
+
   const isCualEs = state.gameType === 'cual_es';
   const isGameParty = state.gameType === 'crossword' || state.gameType === 'pictionary';
   const isHost = state.hostId === myPlayerId;
@@ -1842,10 +1894,14 @@ function renderGame(state) {
     ? `✓ Votaste Abandonar (${abandonVotes.length}/${abandonRequired})`
     : `🏳️ Votar Abandonar Juego (${abandonVotes.length}/${abandonRequired})`;
 
-  ['btn-vote-abandon', 'btn-cuales-vote-abandon', 'btn-gp-vote-abandon'].forEach((btnId) => {
+  ['btn-vote-abandon', 'btn-cuales-vote-abandon', 'btn-gp-vote-abandon', 'btn-mobile-abandon'].forEach((btnId) => {
     const btn = document.getElementById(btnId);
     if (btn) {
-      btn.textContent = abandonText;
+      if (btnId === 'btn-mobile-abandon') {
+        btn.title = abandonText;
+      } else {
+        btn.textContent = abandonText;
+      }
       btn.classList.toggle('voted-abandon', iVotedAbandon);
     }
   });
@@ -2048,6 +2104,33 @@ function updateTurnActionControls(state) {
         ? `🟢 ¡ES TU TURNO, ${currentPlayer.avatar.icon} ${currentPlayer.name}!`
         : `⏳ Turno de ${currentPlayer.avatar.icon} ${currentPlayer.name}`;
     }
+  }
+
+  // Actualizar indicador móvil de turno
+  const mobTurnIndicator = document.getElementById('mobile-turn-indicator');
+  if (mobTurnIndicator && currentPlayer) {
+    mobTurnIndicator.innerHTML = isMyTurn
+      ? `<span class="mgh-my-turn">🎲 ¡Tu Turno! (${currentPlayer.avatar.icon})</span>`
+      : `<span class="mgh-other-turn">⏳ ${currentPlayer.avatar.icon} ${currentPlayer.name.split(' ')[0]}</span>`;
+  }
+
+  // Alerta flotante en móvil si es mi turno y no estoy en la pestaña de Tablero
+  const myTurnBanner = document.getElementById('mobile-my-turn-banner');
+  const mainLayout = document.getElementById('main-game-layout');
+  if (myTurnBanner && mainLayout) {
+    const isNotOnBoard = mainLayout.dataset.activeTab && mainLayout.dataset.activeTab !== 'board';
+    if (isMyTurn && isNotOnBoard && state.status === 'playing' && !isCurrentWalking && state.turnPhase !== 'CARD_CONFIRM') {
+      myTurnBanner.classList.remove('hidden');
+    } else {
+      myTurnBanner.classList.add('hidden');
+    }
+  }
+
+  // Actualizar contador de escrituras en la barra de pestañas móvil
+  const mobPropsBadge = document.getElementById('mobile-props-badge');
+  if (mobPropsBadge && state.properties) {
+    const count = Object.values(state.properties).filter((p) => p.ownerId === myPlayerId).length;
+    mobPropsBadge.textContent = count;
   }
 
   // Botones de acción en el centro
@@ -2455,6 +2538,7 @@ function renderPendingTrades(state) {
   };
 }
 
+let lastKnownChatCount = 0;
 function renderLogsAndChat(state) {
   const logsEl = document.getElementById('game-logs');
   logsEl.innerHTML = '';
@@ -2474,6 +2558,16 @@ function renderLogsAndChat(state) {
     chatEl.appendChild(div);
   });
   chatEl.scrollTop = chatEl.scrollHeight;
+
+  // Notificar mensajes no leídos en la pestaña móvil de Chat
+  const mainLayout = document.getElementById('main-game-layout');
+  if (state.chat && state.chat.length > lastKnownChatCount) {
+    if (lastKnownChatCount > 0 && mainLayout && mainLayout.dataset.activeTab !== 'chat') {
+      const dot = document.getElementById('mobile-chat-badge');
+      if (dot) dot.classList.remove('hidden');
+    }
+    lastKnownChatCount = state.chat.length;
+  }
 }
 
 function openPropertyModal(tileId) {
