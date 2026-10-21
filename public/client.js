@@ -464,6 +464,9 @@ function renderTokensOnBoard(state) {
   state.players.forEach((p) => {
     if (p.bankrupt) return;
     const pos = displayedPositions[p.id] !== undefined ? displayedPositions[p.id] : p.position;
+    if (window.SantiagoMapAnimation && !walkingTimers[p.id]) {
+      window.SantiagoMapAnimation.setPlayerTile(p.id, p.name, p.avatar?.icon, pos, false);
+    }
     const tokenContainer = document.getElementById(`tokens-tile-${pos}`);
     if (tokenContainer) {
       const tok = document.createElement('div');
@@ -494,6 +497,9 @@ function animatePlayerMovement(player, fromPos, toPos) {
   if (forwardDist === 0) {
     displayedPositions[player.id] = toPos;
     renderTokensOnBoard(currentRoomState);
+    if (window.SantiagoMapAnimation) {
+      window.SantiagoMapAnimation.setPlayerTile(player.id, player.name, player.avatar?.icon, toPos, false);
+    }
     return;
   }
 
@@ -525,12 +531,18 @@ function animatePlayerMovement(player, fromPos, toPos) {
       if (currentRoomState) {
         updateTurnActionControls(currentRoomState);
       }
+      if (window.SantiagoMapAnimation) {
+        window.SantiagoMapAnimation.setPlayerTile(player.id, player.name, player.avatar?.icon, toPos, false);
+      }
       return;
     }
 
     const nextTileId = steps[stepIdx];
     displayedPositions[player.id] = nextTileId;
     hoppingPlayers.add(player.id);
+    if (window.SantiagoMapAnimation) {
+      window.SantiagoMapAnimation.setPlayerTile(player.id, player.name, player.avatar?.icon, nextTileId, true);
+    }
 
     // Sonido por cada cuadro avanzado
     playStepSound(stepIdx);
@@ -1016,6 +1028,36 @@ function bindUIEvents() {
     e.currentTarget.textContent = soundEnabled ? '🔊' : '🔇';
     showToast(soundEnabled ? 'Efectos de sonido activados' : 'Sonido silenciado');
   });
+
+  // Alternar Modo Claro / Modo Oscuro
+  function applyTheme(theme) {
+    const isLight = theme === 'light';
+    document.documentElement.classList.toggle('theme-light', isLight);
+    document.body.classList.toggle('theme-light', isLight);
+    localStorage.setItem('gso_theme', theme);
+    document.querySelectorAll('.btn-theme-toggle').forEach((btn) => {
+      btn.textContent = isLight ? '☀️' : '🌙';
+      btn.title = isLight ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro';
+    });
+    if (window.SantiagoMapAnimation) {
+      window.SantiagoMapAnimation.setTheme(theme);
+    }
+  }
+
+  function toggleTheme() {
+    const current = localStorage.getItem('gso_theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    showToast(next === 'light' ? '☀️ Modo Claro activado' : '🌙 Modo Oscuro activado');
+    playTone(480, 0.08, 'triangle');
+  }
+
+  document.querySelectorAll('.btn-theme-toggle').forEach((btn) => {
+    btn.addEventListener('click', toggleTheme);
+  });
+
+  // Inicializar tema guardado
+  applyTheme(localStorage.getItem('gso_theme') || 'dark');
 
   // Chat
   document.getElementById('chat-form').addEventListener('submit', (e) => {
@@ -2431,6 +2473,7 @@ function openPropertyModal(tileId) {
 
   if (!dialog.open) dialog.showModal();
 }
+window.openPropertyModal = openPropertyModal;
 
 function openTradeModal() {
   if (!currentRoomState || currentRoomState.status !== 'playing') return;
@@ -2466,6 +2509,7 @@ function openTradeModal() {
   populateTradeTargetProperties();
   if (!dialog.open) dialog.showModal();
 }
+window.openPropertyModal = openPropertyModal;
 
 function populateTradeTargetProperties() {
   const targetId = document.getElementById('trade-target-player').value;

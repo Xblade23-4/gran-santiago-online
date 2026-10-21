@@ -28,6 +28,212 @@ body {
   color: var(--text-main);
   min-height: 100vh;
   overflow-x: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ================= MODO CLARO (THEME LIGHT) ================= */
+html.theme-light,
+body.theme-light {
+  --bg-dark: #f1f5f9;
+  --bg-panel: rgba(255, 255, 255, 0.94);
+  --bg-card: rgba(255, 255, 255, 0.96);
+  --border-glass: rgba(148, 163, 184, 0.35);
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  background-color: #f1f5f9;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(37, 99, 235, 0.08), transparent 36%),
+    radial-gradient(circle at 88% 82%, rgba(225, 29, 72, 0.08), transparent 38%);
+  color: #0f172a;
+}
+
+body.theme-light .glass-card,
+body.theme-light .auth-card,
+body.theme-light .panel-box,
+body.theme-light .dialog-card {
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .brand-title {
+  color: #0f172a;
+}
+
+body.theme-light .brand-title span {
+  color: #2563eb;
+}
+
+body.theme-light .brand-subtitle,
+body.theme-light .panel-title,
+body.theme-light .stat-item span,
+body.theme-light .lobby-header p {
+  color: #334155;
+}
+
+body.theme-light .board-center {
+  background:
+    radial-gradient(circle at center, rgba(219, 234, 254, 0.55), rgba(241, 245, 249, 0.98)),
+    #f8fafc;
+  border-color: #cbd5e1;
+}
+
+body.theme-light .center-header {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .center-logo {
+  background: linear-gradient(90deg, #0f172a, #1d4ed8, #be123c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+body.theme-light .pot-banner {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #b45309;
+}
+
+body.theme-light .pot-banner strong {
+  color: #b45309;
+}
+
+body.theme-light .turn-stage {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .turn-banner {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+body.theme-light .player-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+body.theme-light .player-item strong {
+  color: #0f172a;
+}
+
+body.theme-light .player-money {
+  color: #059669;
+}
+
+body.theme-light .my-prop-item {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+
+body.theme-light .game-logs,
+body.theme-light .chat-messages {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #1e293b;
+}
+
+body.theme-light .log-entry {
+  color: #334155;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+body.theme-light .chat-msg {
+  color: #1e293b;
+}
+
+body.theme-light .chat-msg strong {
+  color: #2563eb;
+}
+
+body.theme-light input,
+body.theme-light select {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+}
+
+body.theme-light input:focus,
+body.theme-light select:focus {
+  border-color: #2563eb;
+}
+
+body.theme-light .room-pill {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+
+body.theme-light .room-pill strong {
+  color: #2563eb;
+}
+
+body.theme-light .btn-icon {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+body.theme-light .btn-icon:hover {
+  background: #f1f5f9;
+}
+
+body.theme-light .ai-music-player {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: #cbd5e1;
+  color: #0f172a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+body.theme-light .ai-music-info strong {
+  color: #0f172a;
+}
+
+body.theme-light .buy-decision-box {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #10b981;
+  color: #0f172a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+body.theme-light .buy-prompt-text {
+  color: #0f172a;
+}
+
+body.theme-light .lobby-vote-card {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+body.theme-light .lobby-vote-card h3 {
+  color: #0f172a;
+}
+
+body.theme-light .lobby-vote-card p {
+  color: #475569;
+}
+
+body.theme-light .room-item {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+body.theme-light .room-item strong {
+  color: #0f172a;
+}
+
+body.theme-light .cuales-card-circle {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
 h1, h2, h3, h4, .brand-title, .center-logo {
